@@ -1,0 +1,3 @@
+[submodule "craam"]
+	path = craam
+	url = https://bitbucket.org/marekpetrik/craam
