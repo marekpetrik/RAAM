@@ -25,9 +25,8 @@ Requirements:
 - GCC 4.7+ or LLVM with C++11 support
 
 Optional dependencies:
-- Cplex 12.0 (earlier versions may be also supported)
-- Matplotlib 1.0+ for plotting support
 
+- Matplotlib 1.0+ for plotting support
 
 To install, simply execute:
 
@@ -57,4 +56,3 @@ It is also possible to run the tests from the command line as:
 .. code:: bash
 
     python -mraam.test
-
