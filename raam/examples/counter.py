@@ -11,18 +11,12 @@ import raam
 
 class Counter(raam.simulator.Simulator):  
     """
-    Decision state:
-        position
-        
-    Expectation:
-        position, change (+1,-1)
-        
-    Initial state: 0
-        
-    Actions:
-        - plus
-        - minus
-    """
+    Decision state: position in chain
+    Expectation state: position in chain, change (+1,-1)
+    Initial (decision) state: 0
+    Actions: {plus, minus}
+    Rewards: 90%: next position, 10% this position in chain
+     """
 
     @property
     def discount(self):
@@ -55,17 +49,11 @@ class Counter(raam.simulator.Simulator):
 
 class StatefulCounter(raam.simulator.StatefulSimulator):  
     """
-    Decision state:
-        position
-        
-    Expectation:
-        position, change (+1,-1)
-        
-    Initial state: 0
-        
-    Actions:
-        - plus
-        - minus
+    Decision state: position in chain
+    Expectation state: position in chain, change (+1,-1)
+    Initial (decision) state: 0
+    Actions: {plus, minus}
+    Rewards: 90%: next position, 10% this position in chain
     """
 
     def __init__(self):
@@ -101,6 +89,7 @@ class StatefulCounter(raam.simulator.StatefulSimulator):
         
     def reinitstate(self,param):
         self.state = 0
+        return self.state
         
     def actions(self):
         return ['plus','minus']

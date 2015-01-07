@@ -683,7 +683,9 @@ cdef class RoMDP:
 
 class SRoMDP:
     """
-    Robust MDP constructed from samples
+    Robust MDP constructed from samples and an aggregation.
+    
+    See :method:`from_samples` for the description of basic usage.
     """
     
     def __init__(self,states,discount):
@@ -722,14 +724,24 @@ class SRoMDP:
         samples : raam.Samples
             List of samples
         decagg_big : function
-            Aggregation function for decision states, used to construct the actual aggregation
+            Aggregation function for decision states, used to construct the 
+            actual aggregation. The function should return an integer 
+            (could be negative).
         decagg_small : function
-            Aggregation function used to construct outcomes. This is small scale aggregation to average 
-            states that are very close together
+            Aggregation function used to construct outcomes. The solution is 
+            computed as the worst-case over these outcomes. This can be just a
+            finer aggregation function than decagg_big, or could come from 
+            multiple runs. The function should return an integer 
+            (could be negative). Use features.IdCache to simply use the state
+            identity.
         expagg : function
-            Aggregation function for expectation states
+            Aggregation function for expectation states. This is used to average
+            the transition probabilities. The function should return an integer 
+            (could be negative). Use features.IdCache to simply use the state
+            identity.
         actagg : function
-            Aggregation function for actions
+            Aggregation function for actions. The function should return an integer 
+            (could be negative).
         
         See Also
         --------
@@ -848,7 +860,7 @@ class SRoMDP:
         # normalize transitions
         self.rmdp.normalize()
                 
-    def decvalue(self,states,value):
+    def decvalue(self,states,value,minstate=0):
         """
         Corrects the value function and maps the result from an algorithm
         to the value function for decision states.
@@ -864,6 +876,8 @@ class SRoMDP:
         value : numpy.array
             Value function array as an output from the optimization methods. This
             uses an internal representation.
+        minstate : int, optional
+            The minimal index of the state. The default is 0.
         
         Returns
         -------
@@ -873,15 +887,15 @@ class SRoMDP:
         cdef long i, index
         cdef double discountadj = 1/sqrt(self.discount)
         result = np.empty((states,))
-        for i in range(states):
+        for i in range(minstate,minstate+states):
             index = self.statemaps.decstate2state.get(i,-1)
             if index >= 0:
-                result[i] = value[index] * discountadj
+                result[minstate+i] = value[index] * discountadj
             else:
-                result[i] = float('nan')
+                result[minstate+i] = float('nan')
         return result
 
-    def expvalue(self,states,value):
+    def expvalue(self,states,value,minstate=0):
         """
         Corrects the value function and maps the result from an algorithm
         to the value function for expectation states.
@@ -894,6 +908,8 @@ class SRoMDP:
         value : numpy.array
             Value function array as an output from the optimization methods. This
             uses an internal representation.
+        minstate : int, optional
+            The minimal index of the state. The default is 0.
         
         Returns
         -------
@@ -902,15 +918,15 @@ class SRoMDP:
         """
         cdef long i, index
         result = np.empty((states,))
-        for i in range(states):
+        for i in range(minstate,minstate+states):
             index = self.statemaps.expstate2state.get(i,-1)
             if index >= 0:
-                result[i] = value[index] 
+                result[minstate+i] = value[index] 
             else:
-                result[i] = float('nan')
+                result[minstate+i] = float('nan')
         return result
                 
-    def decpolicy(self,states,policy):
+    def decpolicy(self,states,policy,minstate=0):
         """
         Corrects the policy function (a vector) and maps the result from an algorithm
         to the policy over decision states.
@@ -926,7 +942,9 @@ class SRoMDP:
         policy : numpy.array
             Value function array as an output from the optimization methods. This
             uses an internal representation.
-        
+        minstate : int, optional
+            The minimal index of the state. The default is 0.
+
         Returns
         -------
         out : numpy.array(int)
@@ -934,12 +952,12 @@ class SRoMDP:
         """
         cdef long i, index
         result = np.empty((states,),dtype=int)
-        for i in range(states):
+        for i in range(minstate,minstate+states):
             index = self.statemaps.decstate2state.get(i,-1)
             if index >= 0:
-                result[i] = policy[index]
+                result[minstate+i] = policy[index]
             else:
-                result[i] = -1
+                result[minstate+i] = -1
         return result
 
     def statemaps(self):

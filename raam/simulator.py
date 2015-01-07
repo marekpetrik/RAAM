@@ -687,9 +687,10 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         """
         return False
 
-    def simulate(simulator,horizon,policy,runs,initparams=None,end_condition=None,startsteps=0,samples=None):
+    def simulate(simulator,horizon,policy,runs,initparams=None,end_condition=None,
+                    startsteps=0,samples=None):
         """ 
-        Run simulation using the provided policy 
+        Run simulation using the provided policy.
     
         Parameters
         ----------
@@ -724,7 +725,7 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         runs appropriately. The number of total simulation runs is limited by the 
         minimum of ``runs`` and the length of ``initparams``.
         """
-        # from state to state-action
+
         if samples is None:
             samples = raam.samples.MemSamples()
     
@@ -748,15 +749,13 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
             decstate = simulator.reinitstate(param)
             samples.add_initial(decstate)
     
-            for i in range(horizon):
-                
+            for i in range(horizon):    
                 if end_condition(decstate):
                     break
-            
                 action = policy(decstate)
                 expstate = simulator.transition_dec(action)
                 samples.add_dec(DecSample(decstate, action, expstate, i+step, run))
-                                    
+                
                 profit,decstate = simulator.transition_exp()
                 samples.add_exp(ExpSample(expstate, decstate, profit, 1.0, i+step, run))
         
