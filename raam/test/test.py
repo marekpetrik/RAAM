@@ -361,7 +361,6 @@ class OplGenerationTests(unittest.TestCase):
     """ Generating OPL tests """
     def setUp(self):
         np.random.seed(0)
-        #sp.random.seed(0)
         random.seed(0)
         self.sim = raamexamples.shaping.Simulator()
         self.horizon = 30
@@ -834,6 +833,66 @@ class RobustTests(unittest.TestCase):
         t = 2
         self.assertEquals(robust.worstcase_l1(z,q,t),1)
         
+    def test_precise_solution(self):
+        
+        states = 100
+        np.random.seed(1000)
+        
+        P1 = np.random.rand(states,states)
+        P1 = np.diag(1/np.sum(P1,1)).dot(P1)
+        P2 = np.random.rand(states,states)
+        P2 = np.diag(1/np.sum(P2,1)).dot(P2)
+        r1 = np.random.rand(states)
+        r2 = np.random.rand(states)
+        
+        transitions = np.dstack((P1,P2))
+        rewards = np.column_stack((r1,r2))
+        actions = np.array((0,1))
+        outcomes = np.array((0,0))
+        
+        rmdp = crobust.RoMDP(states,0.99)
+        rmdp.from_matrices(transitions,rewards,actions,outcomes)
+        value,policy,residual,iterations = rmdp.mpi_jac(1000)
+         
+        target_value = [ 67.48585933,  67.6855307 ,  67.15995444,  67.33964064,
+            67.35730334,  67.448749  ,  67.38176967,  67.65606086,
+            67.4213027 ,  67.47155931,  67.07684382,  67.74003882,
+            67.47210723,  67.55348594,  67.79191643,  67.2560147 ,
+            67.32406201,  67.07662814,  67.203813  ,  67.33651601,
+            67.39629876,  67.54799239,  67.75385862,  67.44879403,
+            67.60544142,  67.40952776,  67.72621454,  67.50748676,
+            67.73952427,  67.48962016,  67.42326796,  67.76330011,
+            67.52701035,  67.01792733,  66.99424207,  67.56274694,
+            67.42443909,  67.55925349,  67.79285796,  67.79542241,
+            67.68607105,  67.11300935,  67.67777174,  67.72993186,
+            67.33918455,  67.69860449,  67.13698112,  67.28325764,
+            67.46150491,  67.42825846,  66.93853969,  66.94501142,
+            67.674618  ,  67.52613378,  67.51379838,  67.76065074,
+            67.11506578,  67.54995837,  67.51379195,  67.43352184,
+            67.14158378,  67.33359402,  67.640891  ,  67.65412257,
+            67.26273485,  67.66018079,  67.59257637,  67.55906596,
+            67.53662031,  67.57869466,  67.41333565,  67.53192443,
+            67.66909498,  67.60059629,  67.67476778,  67.29658246,
+            67.59379834,  67.62628761,  67.4366966 ,  67.38991289,
+            67.05532434,  67.32839781,  67.52339089,  67.4814972 ,
+            67.61680572,  67.5842589 ,  67.78647861,  67.21290311,
+            67.77571177,  67.55412426,  67.59177463,  67.56476222,
+            67.15030151,  67.74160367,  67.44924929,  67.50222499,
+            67.48111074,  67.70100821,  67.7716321 ,  67.78771736] 
+         
+        target_policy = [0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1,
+            1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+            0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0,
+            1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0,
+            1, 1, 0, 0, 0, 0, 0, 1]
+         
+        for x,y in zip(target_value, value):
+            self.assertAlmostEquals(x,y)
+        for x,y in zip(target_policy, policy):
+            self.assertAlmostEquals(x,y)
+        self.assertEqual(iterations,4)
+        self.assertAlmostEqual(residual,0)
+        
         
 from operator import itemgetter
         
@@ -1205,7 +1264,7 @@ class TestAggregation(unittest.TestCase):
         g = GridAggregation( ((-2,+2),(-6,+6)), (50,50) )
         X,Y = g.meshgrid((50,50))
         Zt = np.sin(X) + np.cos(Y)
-            # compute the function for the aggregation
+        # compute the aggregation function
         f = np.zeros(len(g))
         t = g.sampling_uniform((50,50))
         for it in t:
