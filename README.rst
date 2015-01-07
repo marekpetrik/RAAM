@@ -238,3 +238,4 @@ References
 .. [Iyengar2005] Iyengar, G. N. G. (2005). Robust dynamic programming. Mathematics of Operations Research, 30(2), 1–29. 
 
 .. [Petrik2014] Petrik, M., & Subramanian, D. (2014). RAAM : The benefits of robustness in approximating aggregated MDPs in reinforcement learning. In Neural Information Processing Systems (NIPS).
+
