@@ -16,12 +16,6 @@ from raam import robust
 
 settings = {}
 
-try:
-    import raamexamples
-    settings['raamexamples'] = True
-except:
-    settings['raamexamples'] = False
-
 
 try:
     from optimadp import opl
@@ -140,17 +134,16 @@ class TestHolisticAlgorithmRuns(unittest.TestCase):
 class TestSampleView(unittest.TestCase):
     """ Test the SampleView implementation """
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_samples_view(self):
         np.random.seed(0)
         random.seed(0)
         import copy
         horizon = 200 
         runs = 500
-        config = copy.copy(raamexamples.recommender.config2)
+        config = copy.copy(raam.examples.recommender.config2)
         config['recommendcount'] = 1
         config['objective'] = 'margin'
-        simulator = raamexamples.recommender.Recommender(config)
+        simulator = raam.examples.recommender.Recommender(config)
     
         policy_random = simulator.random_policy()
         samples_original = raam.samples.MemSamples()
@@ -187,25 +180,25 @@ class TestSampleView(unittest.TestCase):
 class BasicTestsSimulation(unittest.TestCase):
     """ Simulation tests """
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
+    def setUp(self):
+        self.horizon = 30
+
     def test_check_simulation(self):
         random.seed(1000)
         np.random.seed(1000)
-        sim = raamexamples.shaping.Simulator()
-        result = sim.simulate(1,raamexamples.shaping.policyNoAction,1)
+        sim = raam.examples.shaping.Simulator()
+        result = sim.simulate(1,raam.examples.shaping.policyNoAction,1)
         ret = result.statistics(sim.discount)['mean_return']
         stats = result.validate()
         self.assertEqual(1, stats['decStates'])
         self.assertEqual(1, stats['expStates'])
         self.assertAlmostEqual(0.040709624769089126, ret)
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_check_simulation_multiple(self):
         random.seed(1000)
         np.random.seed(1000)
-        #sp.random.seed(1000)
-        sim = raamexamples.shaping.Simulator()
-        result = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,range(5))
+        sim = raam.examples.shaping.Simulator()
+        result = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,range(5))
         ret = result.statistics(sim.discount)['mean_return']
         stats = result.validate()
         self.assertAlmostEqual(2.9996420337426062, ret, 4)
@@ -215,7 +208,6 @@ class BasicTestsSimulation(unittest.TestCase):
     def test_check_simulation_multiple_counter(self):
         random.seed(1000)
         np.random.seed(1000)
-        #sp.random.seed(1000)
         horizon = 30
         sim = examples.counter.Counter()
         result = sim.simulate(horizon,sim.random_policy(),5)
@@ -228,7 +220,6 @@ class BasicTestsSimulation(unittest.TestCase):
     def test_check_simulation_multiple_counter_stateful(self):
         random.seed(1000)
         np.random.seed(1000)
-        #sp.random.seed(1000)
         horizon = 30
         sim = examples.counter.StatefulCounter()
         result = sim.simulate(horizon,sim.random_policy(),5)
@@ -238,11 +229,10 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(30*5, stats['decStates'])
         self.assertEqual(30*5, stats['expStates'])
         
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_check_simulation_merge(self):
-        sim = raamraamexamples.shaping.Simulator()
-        result1 = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
-        result2 = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,[2])
+        sim = raam.examples.shaping.Simulator()
+        result1 = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
+        result2 = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,[2])
         stats1 = result1.validate()
         self.assertEqual(1, stats1['runs'])
         self.assertEqual(30, stats1['decStates'])
@@ -259,19 +249,17 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(60, stats['decStates'])
         self.assertEqual(60, stats['expStates'])
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_generate_exp_samples_ofexp(self):
-        sim = raamraamexamples.shaping.Simulator()
-        result = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
+        sim = raam.examples.shaping.Simulator()
+        result = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
         extended = sim.sample_exp_ofexp(result,10)
         stats = extended.validate()
         self.assertEqual(30, stats['decStates'])
         self.assertEqual(330, stats['expStates'])
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_generate_exp_samples_ofdec(self):
-        sim = raamraamexamples.shaping.Simulator()
-        result = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
+        sim = raam.examples.shaping.Simulator()
+        result = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
         extended = sim.sample_exp_ofdec(result,10)
         stats = extended.validate()
         self.assertEqual(30, stats['decStates'])
@@ -294,19 +282,17 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(90, stats['decStates'])
         self.assertEqual(30, stats['expStates'])
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_generate_exp_samples_ofexp_replace(self):
-        sim = raamraamexamples.shaping.Simulator()
-        result = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
+        sim = raam.examples.shaping.Simulator()
+        result = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
         extended = sim.sample_exp_ofexp(result,10,append=False)
         stats = extended.validate()
         self.assertEqual(30, stats['decStates'])
         self.assertEqual(300, stats['expStates'])
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_generate_exp_samples_ofdec_replace(self):
-        sim = raamraamexamples.shaping.Simulator()
-        result = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
+        sim = raam.examples.shaping.Simulator()
+        result = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
         extended = sim.sample_exp_ofdec(result,10,append=False)
         stats = extended.validate()
         self.assertEqual(30, stats['decStates'])
@@ -328,9 +314,8 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(90, stats['decStates'])
         self.assertEqual(30, stats['expStates'])
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_greedy_policy(self):
-        sim = raamraamexamples.shaping.Simulator()
+        sim = raam.examples.shaping.Simulator()
         actions = list(itertools.permutations(range(len(sim.config.action_types)),1)) + [set()]
         greedy = sim.greedy_policy_v(lambda x:0, 10)
         result = sim.simulate(self.horizon,greedy,1)
@@ -339,15 +324,14 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(30, stats['decStates'])
         self.assertEqual(30, stats['expStates'])
 
-    @unittest.skipUnless(settings['raamexamples'],'examples unavailable')
     def test_greedy_better(self):
-        sim = raamraamexamples.shaping.Simulator()
+        sim = raam.examples.shaping.Simulator()
         actions = list(itertools.permutations(range(len(sim.config.action_types)),1)) + [set()]
         greedy = sim.greedy_policy_v(lambda x:0, 10)
         runs = range(10)
 
         result_greedy = sim.simulate(self.horizon,greedy,runs)
-        result_noaction = sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,runs)
+        result_noaction = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,runs)
 
         stats_greedy = result_greedy.validate()
         self.assertEqual(300, stats_greedy['decStates'])
@@ -356,13 +340,13 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(300, stats_noaction['decStates'])
         self.assertEqual(300, stats_noaction['expStates'])
        
-@unittest.skipUnless(settings['opl'] and settings['raamexamples'], 'no oplrun')
+@unittest.skipUnless(settings['opl'], 'no oplrun')
 class OplGenerationTests(unittest.TestCase): 
     """ Generating OPL tests """
     def setUp(self):
         np.random.seed(0)
         random.seed(0)
-        self.sim = raamexamples.shaping.Simulator()
+        self.sim = raam.examples.shaping.Simulator()
         self.horizon = 30
         self.sim2 = examples.pendulum.Simulator2()
 
@@ -407,30 +391,30 @@ class OplGenerationTests(unittest.TestCase):
         self.assertEqual( [e.expStateFrom[0] for e in extended1.expsamples()], \
                 [e.expStateFrom[0] for e in extended1.expsamples()] )
 
-    @unittest.skipUnless(settings['opl'] and settings['raamexamples'], 'no oplrun or raamexamples')
+    @unittest.skipUnless(settings['opl'], 'no oplrun')
     def test_simple_optimization_ofexp(self):
         random.seed(1000)
         np.random.seed(1000)
         #sp.random.seed(1000)
-        result = self.sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
+        result = self.sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
         extended = self.sim.sample_exp_ofexp(result,10) 
-        extended = samples.SampleView(extended, **raamexamples.shaping.Representation)
-        extended = features.apply_dec(extended,raamexamples.shaping.Features.linear[0])
+        extended = samples.SampleView(extended, **raam.examples.shaping.Representation)
+        extended = features.apply_dec(extended,raam.examples.shaping.Features.linear[0])
         stats = extended.validate()
 
         coeffs,solution = opl.run_opl(extended, 'Shaping Simulation', algorithm='ALP-v', \
                 oargs={'lower':-100,'upper':100,'discount':0.9})
         self.assertAlmostEqual(solution['Objective'], 7.41067, 3)
 
-    @unittest.skipUnless(settings['opl'] and settings['raamexamples'], 'no oplrun or raamexamples')
+    @unittest.skipUnless(settings['opl'], 'no oplrun')
     def test_simple_optimization_ofdec(self):
         random.seed(1000)
         np.random.seed(1000)
         #sp.random.seed(1000)
-        result = self.sim.simulate(self.horizon,raamexamples.shaping.policyNoAction,1)
+        result = self.sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,1)
         extended = self.sim.sample_exp_ofdec(result,10) 
-        extended = samples.SampleView(extended, **raamexamples.shaping.Representation)
-        extended = features.apply_dec(extended,raamexamples.shaping.Features.linear[0])
+        extended = samples.SampleView(extended, **raam.examples.shaping.Representation)
+        extended = features.apply_dec(extended,raam.examples.shaping.Features.linear[0])
         stats = extended.validate()
 
         coeffs,solution = opl.run_opl(extended, 'Shaping Simulation', algorithm='ALP-v', \
@@ -896,7 +880,6 @@ class RobustTests(unittest.TestCase):
         
 from operator import itemgetter
         
-@unittest.skipUnless(settings['raamexamples'],'examples unavailable')
 class RobustRecommender(unittest.TestCase):       
     def setUp(self):
         np.random.seed(0)
@@ -904,10 +887,10 @@ class RobustRecommender(unittest.TestCase):
         import copy
         horizon = 200 
         runs = 500
-        config = copy.copy(raamexamples.recommender.config2)
+        config = copy.copy(raam.examples.recommender.config2)
         config['recommendcount'] = 1
         config['objective'] = 'margin'
-        simulator = raamexamples.recommender.Recommender(config)
+        simulator = raam.examples.recommender.Recommender(config)
     
         policy_random = simulator.random_policy()
         samples_random = simulator.simulate(horizon,policy_random,runs)
@@ -1112,7 +1095,7 @@ class RobustFromSamples(unittest.TestCase):
         self.assertAlmostEqual(r.expvalue(4,v)[2], 2.0)
         self.assertAlmostEqual(r.expvalue(4,v)[3], 2.66666666)
 
-@unittest.skipUnless(settings['opl'] and settings['raamexamples'], 'no oplrun or raamexamples')
+@unittest.skipUnless(settings['opl'], 'no oplrun')
 class RobustRecommenderOptimistic(unittest.TestCase):       
     def setUp(self):
         np.random.seed(0)
@@ -1120,10 +1103,10 @@ class RobustRecommenderOptimistic(unittest.TestCase):
         import copy
         horizon = 200 
         runs = 500
-        config = copy.copy(raamexamples.recommender.config2)
+        config = copy.copy(raam.examples.recommender.config2)
         config['recommendcount'] = 1
         config['objective'] = 'margin'
-        simulator = raamexamples.recommender.Recommender(config)
+        simulator = raam.examples.recommender.Recommender(config)
     
         policy_random = simulator.random_policy()
         samples_random = simulator.simulate(horizon,policy_random,runs)
