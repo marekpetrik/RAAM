@@ -39,7 +39,6 @@ setup(
     url='http://watson.ibm.com',
     license='LICENSE',
     description='Algorithms for solving robust and approximate (and plain) Markov decision processes',
-    long_description=open('README.rst').read(),
     install_requires=[
         "numpy >= 1.8.0",
         "cython >= 0.21.0",
