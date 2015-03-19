@@ -14,10 +14,11 @@ import raam
 import pickle
 from raam import features
 
-
 def degradation(fun,charge,discharge):
     """
     Constructs a capacity degradation function from given parameters.
+    
+    The functions are D- and D+: the antiderivatives. See the paper for more details
     
     Parameters
     ----------
@@ -43,18 +44,19 @@ def degradation(fun,charge,discharge):
         discharge_a = np.array(discharge)
         def polynomial(x1,x2):
             if x1 <= x2:    # charge
+                # intentional x2 - x1
                 return np.polynomial.polynomial.polyval(x2,charge_a) - np.polynomial.polynomial.polyval(x1,charge_a) 
             else:           # discharge
-                return np.polynomial.polynomial.polyval(x2,discharge_a) - np.polynomial.polynomial.polyval(x1,discharge_a) 
+                # intentional: x1 - x2
+                return np.polynomial.polynomial.polyval(x1,discharge_a) - np.polynomial.polynomial.polyval(x2,discharge_a) 
         return polynomial
     else:
         raise ValueError('Incorrect function type: "%s"' % funtype)
 
-
 DefaultConfiguration = {
-    "price_buy" : [1,2,3],
+    "price_buy" : [1.2,2.1,3.3],
     "price_sell" : [1,2,3],
-    "price_probabilities" : [0.3, 0.3, 0.4],
+    "price_probabilities" : np.array([[0.8, 0.1, 0.1],[0.1, 0.8, 0.1],[0.1, 0.1, 0.8]]),
     "initial_capacity" : 1,
     "initial_inventory" : 0.5,
     "degradation" : {"fun":"polynomial","charge":[0,0,0.01],"discharge":[0.01,-0.02,0.01]},
@@ -66,27 +68,34 @@ DefaultConfiguration = {
 class Simulator(raam.Simulator):
     """
     Simulates the evolution of the inventory, the total capacity, and the price 
-    levels.
+    levels. The prices come from a Markov chain process.
     
-    Decision state: 
+    The initial state is generated from an expectation state 
+    
+    Decision state (tuple): 
         - inventory
         - capacity
-        - pricebuy
-        - pricesell 
+        - priceindex 
     
     Expectation state: 
         - inventory
         - capacity
+        - priceindex
         - reward
     
     Action: charge change
+
+    Parameters
+    ----------
+
     """
 
-    def __init__(self,config=DefaultConfiguration):
+    def __init__(self,config,discount=0.9999):
         """ 
         If no filename and no configuration are provided, 
         then the configuration is created automatically 
         """
+        self.discount = discount
         self.degradation = degradation(**config['degradation'])
         self.initial_capacity = config['initial_capacity']
         self.price_buy = config['price_buy']
@@ -98,8 +107,9 @@ class Simulator(raam.Simulator):
 
         assert np.all(np.array(self.price_buy) >= 0)
         assert np.all(np.array(self.price_sell) >= 0)
-        assert np.sum(self.price_probabilities) == 1
-        assert len(self.price_probabilities) == len(self.price_buy) == len(self.price_sell)
+        assert len(self.price_buy) == len(self.price_sell)
+        assert self.price_probabilities.shape[0] == self.price_probabilities.shape[1] == len(self.price_sell)
+        assert np.max(np.abs(np.sum(self.price_probabilities,1) - 1)) < 0.01
         assert np.all(np.array(self.price_probabilities) >= 0)
         assert self.capacity_cost >= 0
         assert type(self.change_capacity) is bool
@@ -107,7 +117,7 @@ class Simulator(raam.Simulator):
 
     @property
     def discount(self):
-        return 0.99
+        return self.discount
 
     def transition_dec(self,decstate,action):
         """ 

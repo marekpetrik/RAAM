@@ -8,7 +8,6 @@ from raam import examples
 import unittest
 import random
 import numpy as np
-import subprocess
 
 from raam import features
 from raam import crobust

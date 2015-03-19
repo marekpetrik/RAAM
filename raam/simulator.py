@@ -45,12 +45,12 @@ An alternative is to implement the simple simulator interface
 needs to track the current state of the simulation.
 """
 import numpy as np
-import random
 import abc
 import raam.samples
 from raam.samples import DecSample, ExpSample
 import itertools
 import collections
+import random
 
 class Simulator(metaclass=abc.ABCMeta):
     """
@@ -187,7 +187,8 @@ class Simulator(metaclass=abc.ABCMeta):
             result += self.discount * value(decstate)
         return result/samplecount
 
-    def simulate(simulator,horizon,policy,runs,initstates=None,end_condition=None,startsteps=0,samples=None):
+    def simulate(simulator,horizon,policy,runs,initstates=None,end_condition=None,
+                 startsteps=0,samples=None,probterm=None):
         """ 
         Run simulation using the provided policy 
     
@@ -212,6 +213,10 @@ class Simulator(metaclass=abc.ABCMeta):
         samples : raam.samples.Samples, optional
             Sample storage. If None, then a memory backed sample storage is 
             created and used.
+        probterm : float, optional
+            Simulation termination probability in each step. Can be set to 1-discount to
+            simulate the behavior with discount representing the termination
+            probability.
     
         Returns
         -------
@@ -252,6 +257,10 @@ class Simulator(metaclass=abc.ABCMeta):
                 
                 if end_condition(decstate):
                     break
+                if probterm is not None:
+                    if random.random() <= probterm:
+                        break
+
                 
                 action = policy(decstate)
                 expstate = simulator.transition_dec(decstate, action)
@@ -688,7 +697,7 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         return False
 
     def simulate(simulator,horizon,policy,runs,initparams=None,end_condition=None,
-                    startsteps=0,samples=None):
+                    startsteps=0,samples=None,probterm=None):
         """ 
         Run simulation using the provided policy.
     
@@ -713,6 +722,10 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         samples : raam.samples.Samples, optional
             Sample storage. If None, then a memory backed sample storage is 
             created and used.
+        probterm : float, optional
+            Simulation termination probability in each step. Can be set to 1-discount to
+            simulate the behavior with discount representing the termination
+            probability.
     
         Returns
         -------
@@ -752,6 +765,10 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
             for i in range(horizon):    
                 if end_condition(decstate):
                     break
+                if probterm is not None:
+                    if random.random() <= probterm:
+                        break
+                
                 action = policy(decstate)
                 expstate = simulator.transition_dec(action)
                 samples.add_dec(DecSample(decstate, action, expstate, i+step, run))
@@ -851,7 +868,7 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
                 return actions[actionid]
             return policy
         else:
-            if len(dec_agg) != len(policy_vec):
+            if len(decagg) != len(policy_vec):
                 raise ValueError("The length of the aggregation and policy vectors do not match.")
             if np.max(policy_vec) >= len(actions):
                 raise ValueError("Not enough of actions provided for the policy.")
