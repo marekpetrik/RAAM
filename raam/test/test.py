@@ -3,11 +3,13 @@
 Unit tests (:mod:`raam.test`)
 =================================
 """
-from raam import *
+import raam
 from raam import examples
 import unittest
 import random
 import numpy as np
+import itertools
+import json
 
 from raam import features
 from raam import crobust
@@ -31,7 +33,7 @@ except:
 class BasicTests(unittest.TestCase):
     """ Tests basics """
     def test_representation(self):
-        q = create_test_sample()
+        q = raam.create_test_sample()
         s = q.validate()
         r = q.statistics(0.95)['mean_return']
         self.assertAlmostEqual(5.6075, r)
@@ -240,7 +242,7 @@ class BasicTestsSimulation(unittest.TestCase):
         self.assertEqual(1, stats2['runs'])
         self.assertEqual(30, stats2['decStates'])
         self.assertEqual(30, stats2['expStates'])
-        result = MemSamples()
+        result = raam.samples.MemSamples()
         result.merge(result1)
         result.merge(result2)
         stats = result.validate()
