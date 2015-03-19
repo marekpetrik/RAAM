@@ -87,7 +87,10 @@ class Simulator(raam.Simulator):
 
     Parameters
     ----------
-
+    config : dict
+        Configuration. See DefaultConfiguration for an example
+    discount : float, optional
+        Discount factor
     """
 
     def __init__(self,config,discount=0.9999):
@@ -128,23 +131,26 @@ class Simulator(raam.Simulator):
         decstate : decision state
             inventory,capacity,pricebuy,pricesell 
         action : float
-            change in charge
+            change in charge (this is a float value, not the index)
 
         Returns
         -------
         out : expectation state
             inventory,capacity,reward
         """
-        inventory, capacity, pricebuy, pricesell = decstate
-
+        inventory, capacity, priceindex = decstate
+        
+        pricesell = self.price_sell[priceindex]
+        pricebuy = self.price_buy[priceindex]
+        
         assert inventory >= 0
         assert inventory <= capacity
-
+        
         action = max(action, - inventory)
         action = min(action, capacity - inventory)
-
+        
         ninventory = inventory + action
-        capacity_loss = self.degradation(ninventory / capacity, inventory / capacity) * capacity
+        capacity_loss = self.degradation(inventory / capacity, ninventory / capacity) * capacity
         assert capacity_loss >= -1e-10
         if self.change_capacity:
             ncapacity = max(0,capacity - capacity_loss)
@@ -152,9 +158,9 @@ class Simulator(raam.Simulator):
         else:
             ncapacity = capacity
 
-        reward = (pricebuy if action >= 0 else pricesell) * action
+        reward = - (pricebuy if action >= 0 else pricesell) * action
         reward -= capacity_loss * self.capacity_cost
-        return (ninventory,ncapacity,reward)
+        return (ninventory,ncapacity,priceindex,reward)
 
     def transition_exp(self,expstate):
         """ 
@@ -169,20 +175,27 @@ class Simulator(raam.Simulator):
         reward : float
         decision state : object
         """
-        inventory,capacity,reward = expstate
+        inventory,capacity,priceindex,reward = expstate
         
         assert inventory >= 0
         assert inventory <= capacity
 
-        priceindex = np.random.choice(np.array(range(len(self.price_probabilities))), p=self.price_probabilities)
-        return (reward,(inventory,capacity,self.price_buy[priceindex],self.price_sell[priceindex]))
+        pricecount = len(self.price_probabilities[priceindex,:])
+
+        # this is very slow. It would be better to use the cython code from examples 
+        # for this
+        priceindex = np.random.choice(\
+            np.arange(pricecount,dtype=int), \
+            p=self.price_probabilities[priceindex,:])
+        
+        return (reward,(inventory,capacity,priceindex))
 
     def actions(self,decstate):
-        inventory, capacity, _, _ = decstate
+        inventory, capacity, _ = decstate
         return np.arange(-inventory, capacity - inventory, 0.05)
 
     def stateiterator(self):
-        expstate = (self.initial_inventory,self.initial_capacity,0)
+        expstate = (self.initial_inventory,self.initial_capacity,0,0)
         while True:
             yield self.transition_exp(expstate)[1]
 
@@ -195,3 +208,83 @@ class Features:
     """
     linear = (features.piecewise_linear(None), features.piecewise_linear(None))
 
+## Threshold policy definitions
+
+def threshold_policy(lowers, uppers, simulator):
+    """
+    Construct a threshold policy with different thresholds for different price 
+    indexes.
+    
+    Assumes that the capacity of the battery does not change.
+    
+    Lower is the lower inventory target, and upper is the upper inventory target
+    
+    Parameters
+    ----------
+    lowers : list
+        List of lower thresholds
+    uppers : list
+        List of upper thresholds
+    simulator : inventory.Simulator
+        Simulator of the inventory problem (used to determine available actions)
+    """    
+    assert len(lowers) == len(uppers)
+    assert np.min(uppers - lowers) >= -1e-4
+    
+    def policy(state):
+        inventory,capacity,priceindex = state
+        
+        # compute the target charge change
+        if inventory < lowers[priceindex]:
+            target = lowers[priceindex] - inventory # the target charge change
+        elif inventory > uppers[priceindex]:
+            target = uppers[priceindex] - inventory # the target charge change
+        else:
+            # if it is between the thresholds, then there is no change
+            target = 0
+        
+        # find the closest (discretized) action
+        actions = simulator.actions(state)
+        actionindex = np.argmin(np.abs(actions - target))
+        return actions[actionindex]
+    
+    return policy
+
+
+## Plotting functions
+
+def plot_degradation(degrad, ex_inventories = [0.1,0.5,0.9],delta=None):
+    """
+    Plots the degradation function for examples of the current inventory
+    
+    Parameters
+    ----------
+    degrad : fun
+        Degradation function, the output of :fun:`degradation`
+    ex_inventories : list, optional
+        List of example inventories to use for plotting
+    delta : dict
+        Two delta functions (the derivative of the degradation)
+    """
+    
+    import matplotlib.pyplot as pp
+    
+    x = np.linspace(0,1,100)
+    
+    #ax1 = pp.subplot()
+    
+    for ei in ex_inventories:
+        y = np.array([degrad(ei, ix) for ix in x])
+        pp.plot(100*x,100*y,label="$d(x,y-x)$,$x=%2.0f\\%%$" % (100*ei))
+        
+    #ax2 = ax1.twinx()
+    
+    if delta is not None:
+        pp.plot(100*x, 100*delta['charge'](x), '.', label='$\\delta_+$')
+        pp.plot(100*x, 100*delta['discharge'](x), '.', label='$\\delta_-$')
+        
+    pp.xlabel('New State of Charge (%): $y$')
+    pp.ylabel('Capacity Loss (%): $d(x,y-x)$')
+    
+    pp.legend(loc=9)
+    pp.grid()
