@@ -257,17 +257,19 @@ class Simulator(metaclass=abc.ABCMeta):
                 
                 if end_condition(decstate):
                     break
-                if probterm is not None:
-                    if random.random() <= probterm:
-                        break
 
-                
                 action = policy(decstate)
                 expstate = simulator.transition_dec(decstate, action)
                 samples.add_dec(DecSample(decstate, action, expstate, i+step, run))
                                     
                 profit,decstate = simulator.transition_exp(expstate)
                 samples.add_exp(ExpSample(expstate, decstate, profit, 1.0, i+step, run))
+
+                # test the termination probablity only after at least one transition
+                if probterm is not None:
+                    if random.random() <= probterm:
+                        break
+
         
         return samples
     
@@ -765,9 +767,6 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
             for i in range(horizon):    
                 if end_condition(decstate):
                     break
-                if probterm is not None:
-                    if random.random() <= probterm:
-                        break
                 
                 action = policy(decstate)
                 expstate = simulator.transition_dec(action)
@@ -775,6 +774,11 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
                 
                 profit,decstate = simulator.transition_exp()
                 samples.add_exp(ExpSample(expstate, decstate, profit, 1.0, i+step, run))
+
+                # test the termination probablity only after at least one transition
+                if probterm is not None:
+                    if random.random() <= probterm:
+                        break
         
         return samples
     

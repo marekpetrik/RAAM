@@ -340,6 +340,42 @@ class BasicTestsSimulation(unittest.TestCase):
         stats_noaction = result_noaction.validate()
         self.assertEqual(300, stats_noaction['decStates'])
         self.assertEqual(300, stats_noaction['expStates'])
+        
+from collections import Counter
+class SimulationTerminationTests(unittest.TestCase):
+    
+    def setUp(self):
+        self.runs = 2000
+        self.probterm = 0.1
+
+    @staticmethod
+    def correct_probability(state, discount):
+        """ The correct visitation probability of the state """
+        return discount**state 
+
+    def test_stateless(self):
+        random.seed(1982)
+        c = raam.examples.counter.Counter(succ_prob=1)
+        samples = c.simulate(1000,  lambda s: c.actions(s)[0], self.runs, probterm=self.probterm)
+        decsamples = samples.decsamples()
+        decstates = [decsample.decStateFrom for decsample in decsamples]
+        
+        counter = Counter(decstates)
+        for state, frequency in counter.items():
+            self.assertTrue(abs(SimulationTerminationTests.correct_probability(state, 1-self.probterm) \
+                - frequency / self.runs) < 0.02)
+    
+    def test_statefull(self):
+        random.seed(1982)
+        c = raam.examples.counter.StatefulCounter(succ_prob=1)
+        samples = c.simulate(1000,  lambda s: c.actions()[0], self.runs, probterm=self.probterm)
+        decsamples = samples.decsamples()
+        decstates = [decsample.decStateFrom for decsample in decsamples]
+        
+        counter = Counter(decstates)
+        for state, frequency in counter.items():
+            self.assertTrue(abs(SimulationTerminationTests.correct_probability(state, 1-self.probterm) \
+                - frequency / self.runs) < 0.02)        
        
 @unittest.skipUnless(settings['opl'], 'no oplrun')
 class OplGenerationTests(unittest.TestCase): 
