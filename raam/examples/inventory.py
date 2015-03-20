@@ -98,7 +98,7 @@ class Simulator(raam.Simulator):
         If no filename and no configuration are provided, 
         then the configuration is created automatically 
         """
-        self.discount = discount
+        self._discount = discount
         self.degradation = degradation(**config['degradation'])
         self.initial_capacity = config['initial_capacity']
         self.price_buy = config['price_buy']
@@ -120,7 +120,7 @@ class Simulator(raam.Simulator):
 
     @property
     def discount(self):
-        return self.discount
+        return self._discount
 
     def transition_dec(self,decstate,action):
         """ 
