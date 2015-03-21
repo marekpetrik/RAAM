@@ -59,7 +59,7 @@ DefaultConfiguration = {
     "price_probabilities" : np.array([[0.8, 0.1, 0.1],[0.1, 0.8, 0.1],[0.1, 0.1, 0.8]]),
     "initial_capacity" : 1,
     "initial_inventory" : 0.5,
-    "degradation" : {"fun":"polynomial","charge":[0,0,0.01],"discharge":[0.01,-0.02,0.01]},
+    "degradation" : {"fun":"polynomial","charge":[0,0,0.01],"discharge":[0.01,0.02,0.01]},
     "capacity_cost" : 1,
     "change_capacity" : True
     }
