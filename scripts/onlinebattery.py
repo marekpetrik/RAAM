@@ -23,6 +23,9 @@ random_samples = sim.simulate(horizon, sim.random_policy(), runs)
 
 print('Random policy:', random_samples.statistics(sim.discount)['mean_return'])
 
+random_samples = sim.sample_dec_ofdec(random_samples)
+random_samples = sim.sample_exp_ofdec(random_samples,10)
+
 samples = random_samples
 
 ## Build Approximation Properties
