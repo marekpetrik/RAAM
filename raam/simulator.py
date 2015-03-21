@@ -862,22 +862,20 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
             policy = lambda decstate: actions[bestactions[decagg(decstate)]]
     
     elif len(policy_vec.shape) == 1:
+        # we have a *deterministic* policy here
+        if np.max(policy_vec) >= len(actions):
+            raise ValueError("Action index %d prescribed by the policy does not exist." % np.max(policy_vec))
+        if np.min(policy_vec) < -1:
+            raise ValueError("Negative action indices less than -1 (undefined) are not allowed.")
+
         if noaction is None:
-            # we have a *deterministic* policy here
             def policy(decstate):
                 actionid = policy_vec[decagg(decstate)]
                 if actionid < 0:
                     raise RuntimeError('Undefined action (-1) for state %s.' % str(decstate))
-            
                 return actions[actionid]
             return policy
-        else:
-            if len(decagg) != len(policy_vec):
-                raise ValueError("The length of the aggregation and policy vectors do not match.")
-            if np.max(policy_vec) >= len(actions):
-                raise ValueError("Not enough of actions provided for the policy.")
-            
-                
+        else:            
             def policy(decstate):
                 actionid = policy_vec[decagg(decstate)]
                 if actionid < 0:
