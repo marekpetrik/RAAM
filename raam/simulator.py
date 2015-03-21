@@ -438,7 +438,7 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Returns
         -------
-        out : dict 
+        out : samples.Samples 
             Original samples with the additional expectation states augmented
     
         Notes
@@ -474,7 +474,7 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Returns
         -------
-        out : dict 
+        out : samples.Samples 
             Original samples with the additional expectation states augmented
     
         Notes
@@ -510,7 +510,7 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Returns
         -------
-        out : dict 
+        out : samples.Samples 
             Original samples with the additional decision states augmented
     
         Notes
@@ -557,7 +557,7 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Returns
         -------
-        out : dict 
+        out : samples.Samples 
             Original samples with the additional decision states augmented
     
         Notes
