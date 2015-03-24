@@ -91,14 +91,20 @@ class Simulator(raam.Simulator):
         Configuration. See DefaultConfiguration for an example
     discount : float, optional
         Discount factor
+    action_step : float, optional
+        Discretization step for actions. This is an absolute number and should
+        scale with the size of the storage.
     """
 
-    def __init__(self,config,discount=0.9999):
+    def __init__(self,config,discount=0.9999,action_step=0.05):
         """ 
         If no filename and no configuration are provided, 
         then the configuration is created automatically 
         """
+        
         self._discount = discount
+        self._action_step = action_step
+        
         self.degradation = degradation(**config['degradation'])
         self.initial_capacity = config['initial_capacity']
         self.price_buy = config['price_buy']
@@ -192,7 +198,7 @@ class Simulator(raam.Simulator):
 
     def actions(self,decstate):
         inventory, capacity, _ = decstate
-        return np.arange(-inventory, capacity - inventory, 0.05)
+        return np.arange(-inventory, capacity - inventory, self._action_step)
 
     def stateiterator(self):
         expstate = (self.initial_inventory,self.initial_capacity,0,0)
