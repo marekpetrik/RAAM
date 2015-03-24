@@ -9,26 +9,26 @@ from raam import crobust
 
 ## Get Samples
 
-horizon = 600
+horizon = 100
 runs = 5
 
-config = configuration.construct_martingale(np.arange(3), 3)
+config = configuration.construct_martingale(np.arange(2), 2)
 
 # Assume that the battery capacity does not change
 config['change_capacity'] = False
 
-sim = raam.examples.inventory.Simulator(config)     
+sim = raam.examples.inventory.Simulator(config,action_step=0.5)     
 
 random_samples = sim.simulate(horizon, sim.random_policy(), runs)
 
 print('Random policy:', random_samples.statistics(sim.discount)['mean_return'])
 
 random_samples = sim.sample_dec_ofdec(random_samples)
-random_samples = sim.sample_exp_ofdec(random_samples,10)
+random_samples = sim.sample_exp_ofdec(random_samples,2)
 
 samples = random_samples
 
-## Build Approximation Properties
+## Build Approximation Features
 
 def decmap(s):
     soc,capacity,priceindex = s
@@ -64,6 +64,8 @@ dab = lambda x: decagg_big.classify(x,True)
 das = lambda x: 0
 
 ea = lambda x: expagg.classify(x,True)
+
+#TODO: The actions need to be mapped
 aa = lambda x : x
 
 srmdp = crobust.SRoMDP(0,sim.discount)
@@ -94,6 +96,7 @@ rob_policy_vec_dec = srmdp.decpolicy(len(decagg_big), rob_policy_vec)
 opt_policy_vec_dec = srmdp.decpolicy(len(decagg_big), opt_policy_vec)
 avg_policy_vec_dec = srmdp.decpolicy(len(decagg_big), avg_policy_vec)
 
+#TODO: this action description is wrong
 rob_policy = raam.vec2policy(rob_policy_vec_dec, [0,1], lambda x: dab(decmap(x)),0)
 opt_policy = raam.vec2policy(opt_policy_vec_dec, [0,1], lambda x: dab(decmap(x)),0)
 avg_policy = raam.vec2policy(avg_policy_vec_dec, [0,1], lambda x: dab(decmap(x)),0)
@@ -101,5 +104,4 @@ avg_policy = raam.vec2policy(avg_policy_vec_dec, [0,1], lambda x: dab(decmap(x))
 ## Evaluate the computed policy
 
 optimized_samples = sim.simulate(horizon, rob_policy, runs)
-
 print('Optimized policy:', optimized_samples.statistics(sim.discount)['mean_return'])
