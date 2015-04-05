@@ -14,6 +14,8 @@ import raam
 import pickle
 from raam import features
 
+epsilon = 1e-10
+
 def degradation(fun,charge,discharge):
     """
     Constructs a capacity degradation function from given parameters.
@@ -84,6 +86,7 @@ class Simulator(raam.Simulator):
         - reward
     
     Action: charge change
+        This is not an index but an absolute value of the charge change
 
     Parameters
     ----------
@@ -197,8 +200,18 @@ class Simulator(raam.Simulator):
         return (reward,(inventory,capacity,priceindex))
 
     def actions(self,decstate):
+        """
+        List of applicable actions in the state
+        """
         inventory, capacity, _ = decstate
-        return np.arange(-inventory, capacity - inventory, self._action_step)
+        return np.arange(-inventory, capacity - inventory + epsilon, self._action_step)
+
+    def all_actions(self):
+        """
+        List of all possible actions (charge and discharge capacities)
+        """
+        return np.arange(-self.initial_capacity, self.initial_capacity + epsilon, \
+                            self._action_step)
 
     def stateiterator(self):
         expstate = (self.initial_inventory,self.initial_capacity,0,0)
