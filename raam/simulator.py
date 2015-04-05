@@ -188,7 +188,7 @@ class Simulator(metaclass=abc.ABCMeta):
         return result/samplecount
 
     def simulate(simulator,horizon,policy,runs,initstates=None,end_condition=None,
-                 startsteps=0,samples=None,probterm=None):
+                 startsteps=0,samples=None,probterm=None,transitionlimit=None):
         """ 
         Run simulation using the provided policy 
     
@@ -214,9 +214,12 @@ class Simulator(metaclass=abc.ABCMeta):
             Sample storage. If None, then a memory backed sample storage is 
             created and used.
         probterm : float, optional
-            Simulation termination probability in each step. Can be set to 1-discount to
-            simulate the behavior with discount representing the termination
-            probability.
+            Simulation termination probability in each step. Can be set to 
+            1-``discount`` to simulate the behavior with discount representing 
+            the termination probability.
+        transitionlimit : int, optional
+            Stops simulation when this number of transitions sampled is reached.
+            No limit when omitted.
     
         Returns
         -------
@@ -248,6 +251,9 @@ class Simulator(metaclass=abc.ABCMeta):
         if not isinstance(initstates,collections.Iterable):
             raise ValueError('Initstates must be iterable')
     
+        # the total number of transitions sampled
+        transitions = 0
+    
         for di,run,step in zip(initstates,runs,startsteps):
             
             decstate = di
@@ -257,6 +263,9 @@ class Simulator(metaclass=abc.ABCMeta):
                 
                 if end_condition(decstate):
                     break
+                
+                if transitionlimit is not None and transitions >= transitionlimit:
+                    break
 
                 action = policy(decstate)
                 expstate = simulator.transition_dec(decstate, action)
@@ -265,10 +274,15 @@ class Simulator(metaclass=abc.ABCMeta):
                 profit,decstate = simulator.transition_exp(expstate)
                 samples.add_exp(ExpSample(expstate, decstate, profit, 1.0, i+step, run))
 
-                # test the termination probablity only after at least one transition
+                # test the termination probability only after at least one transition
                 if probterm is not None:
                     if random.random() <= probterm:
                         break
+                
+                transitions += 1
+            
+            if transitionlimit is not None and transitions >= transitionlimit:
+                break
 
         
         return samples
@@ -431,10 +445,11 @@ class Simulator(metaclass=abc.ABCMeta):
         samples : dict 
             Collection of samples being expanded. This object is not modified.
         count : int
-            The number of additional samples to generate for each expectation state.
-        append : bool (optional, True)
+            The number of additional samples to generate for each 
+            expectation state.
+        append : bool, optional
             Whether to append the original expectation samples or if they 
-            should be discarded. The samples are appended to a new object
+            should be discarded. Default is true.
     
         Returns
         -------
@@ -443,8 +458,8 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Notes
         -----
-        The function does not check for duplicates. It is possible there are multiple
-        samples then.
+        The function does not check for duplicates. It is possible there 
+        are multiple samples then.
         """
     
         new_samples = samples.copy(dec=True,exp=append,initial=True)
@@ -469,8 +484,9 @@ class Simulator(metaclass=abc.ABCMeta):
             Collection of samples being expanded. This object is not modified.
         count : int
             The number of additional samples to generate for each decision state 
-        append : bool (optional, True)
-            Whether to append the original expectation samples or if they should be discarded.
+        append : bool, optional
+            Whether to append the original expectation samples or if they 
+            should be discarded. Default is true.
     
         Returns
         -------
@@ -479,8 +495,8 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Notes
         -----
-        The function does not check for duplicates. It is possible there are multiple
-        samples then.
+        The function does not check for duplicates. It is possible there
+        are multiple samples then.
         """
         new_samples = samples.copy(dec=True,exp=append,initial=True)
         
@@ -505,8 +521,9 @@ class Simulator(metaclass=abc.ABCMeta):
         policy : function (decstate -> action)
             The policy used to generate the new samples. If None, then all
             actions are used
-        append : bool (optional, True)
-            Whether to append the original decision samples or if they should be discarded.
+        append : bool, optional
+            Whether to append the original expectation samples or if they 
+            should be discarded. Default is true.
     
         Returns
         -------
@@ -515,8 +532,8 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Notes
         -----
-        The function does not check for duplicates. It is very likely there are multiple
-        samples then with the same state and action.
+        The function does not check for duplicates. It is very likely there 
+        are multiple samples then with the same state and action.
         """
         
         new_samples = samples.copy(dec=append,exp=True,initial=True)
@@ -552,8 +569,9 @@ class Simulator(metaclass=abc.ABCMeta):
         policy : function (decstate -> action)
             The policy used to generate the new samples. If None, then all
             actions are used
-        append : bool (optional, True)
-            Whether to append the original decision samples or if they should be discarded.
+        append : bool, optional
+            Whether to append the original expectation samples or if they 
+            should be discarded. Default is true.
     
         Returns
         -------
@@ -562,8 +580,8 @@ class Simulator(metaclass=abc.ABCMeta):
     
         Notes
         -----
-        The function does not check for duplicates. It is very likely there are multiple
-        samples then with the same state and action.
+        The function does not check for duplicates. It is very likely there 
+        are multiple samples then with the same state and action.
         """
         
         new_samples = samples.copy(dec=append,exp=True,initial=True)
@@ -591,13 +609,13 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
     Represents a simulator class that can be used to generate samples.
     The class must be inherited from to define the actual simulator.
     
-    This simulator only supports restarts and continuation from the previous state. 
-    The simulator cannot be stateless. See the class :class:`Simulator` for a 
-    simulator with greater control over sampling.
+    This simulator only supports restarts and continuation from the previous 
+    state.  The simulator cannot be stateless. See the class :class:`Simulator` 
+    for a simulator with greater control over sampling.
 
     The representation of the decision and expectation states may be arbitrary,
-    but they must be convertible to lists/vectors of real numbers using ``decstate_rep``
-    and ``expstate_rep``.
+    but they must be convertible to lists/vectors of real numbers using 
+    ``decstate_rep`` and ``expstate_rep``.
 
     Notes
     -----
@@ -699,7 +717,7 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         return False
 
     def simulate(simulator,horizon,policy,runs,initparams=None,end_condition=None,
-                    startsteps=0,samples=None,probterm=None):
+                    startsteps=0,samples=None,probterm=None,transitionlimit=None):
         """ 
         Run simulation using the provided policy.
     
@@ -725,9 +743,12 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
             Sample storage. If None, then a memory backed sample storage is 
             created and used.
         probterm : float, optional
-            Simulation termination probability in each step. Can be set to 1-discount to
-            simulate the behavior with discount representing the termination
-            probability.
+            Simulation termination probability in each step. Can be set to 
+            1-``discount`` to simulate the behavior with discount representing 
+            the termination probability.
+        transitionlimit : int, optional
+            Stops simulation when this number of transitions sampled is reached.
+            No limit when omitted.
     
         Returns
         -------
@@ -759,6 +780,9 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         if not isinstance(initparams,collections.Iterable):
             raise ValueError('Initparams must be iterable')
     
+        # the total number of transitions sampled
+        transitions = 0
+
         for param,run,step in zip(initparams,runs,startsteps):
             
             decstate = simulator.reinitstate(param)
@@ -766,6 +790,9 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
     
             for i in range(horizon):    
                 if end_condition(decstate):
+                    break
+
+                if transitionlimit is not None and transitions >= transitionlimit:
                     break
                 
                 action = policy(decstate)
@@ -779,6 +806,11 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
                 if probterm is not None:
                     if random.random() <= probterm:
                         break
+                
+                transitions += 1
+
+            if transitionlimit is not None and transitions >= transitionlimit:
+                break
         
         return samples
     
@@ -855,7 +887,8 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
         if np.min(np.max(policy_vec,1)) < 0.999:
             # the policy is randomized
             #TODO: np.random.choice is particularly slow
-            policy = lambda decstate: np.random.choice(actions,1,p=policy_vec[decagg(decstate)])[0]
+            policy = lambda decstate: np.random.choice(actions,1,\
+                                p=policy_vec[decagg(decstate)])[0]
         else:
             # the policy is deterministic
             bestactions = np.argmax(policy_vec,1)
