@@ -1,107 +1,125 @@
+"""
+Runs online optimization of the degradable battery problem
+"""
+
+## Configuration
 # cd Projects/raam/scripts
 
 import raam
 import raam.examples
 import numpy as np
 import configuration
-
 from raam import crobust
 
-## Get Samples
+import online
 
-horizon = 100
-runs = 5
+horizon = 3000              # maximal simulation horizon
+runs = 5                    # maximal number of runs
+sample_count = 4000         # total maximal number of samples
 
-config = configuration.construct_martingale(np.arange(2), 2)
+## Construct simulator
 
-# Assume that the battery capacity does not change
-config['change_capacity'] = False
+print('Simulation parameter bounds: horizon %d, runs %d, samples %d' % (horizon,runs,sample_count))
 
-sim = raam.examples.inventory.Simulator(config,action_step=0.5)     
+# problem configuration
+config = configuration.construct_martingale(np.arange(5), 5)
+config['change_capacity'] = True
+sim = raam.examples.inventory.Simulator(config,action_step=0.1,discount=0.8)
 
-random_samples = sim.simulate(horizon, sim.random_policy(), runs)
+# construct the set of possible actions to map them to indexes
+all_actions = sim.all_actions()
 
-print('Random policy:', random_samples.statistics(sim.discount)['mean_return'])
-
-random_samples = sim.sample_dec_ofdec(random_samples)
-random_samples = sim.sample_exp_ofdec(random_samples,2)
-
-samples = random_samples
-
-## Build Approximation Features
+## Construct aggregation parameters
 
 def decmap(s):
     soc,capacity,priceindex = s
+    assert type(priceindex) == int or type(priceindex) == np.int64
     return (soc,priceindex)
     
 def expmap(s):
     soc,capacity,priceindex,reward = s
     return (soc,capacity,reward)
 
+epsilon = 1e-6
+
+discretization = 3
+
+#** for narrow samples
+# decision state: soc, priceindex
+decagg_big = raam.features.GridAggregation( \
+                    ((0,config['initial_capacity']+epsilon), (0,config['price_sell'].shape[0])),\
+                    (discretization, config['price_sell'].shape[0]) )
+
+# expectation state: soc, priceindex, reward 
+expagg = raam.features.GridAggregation( \
+                    ((0,config['initial_capacity']+epsilon), (0,config['price_sell'].shape[0]), (-5,5)), \
+                    (3*discretization, config['price_sell'].shape[0], 200) )
+
+# decision states
+dab = lambda x: decagg_big.classify(x,True)     
+# expectation states
+ea = lambda x: expagg.classify(x,True)
+# used to represent the worst case for decision states
+das = lambda x: 0
+# used to represent the worst case for decision states
+aa = lambda x : np.argmin(np.abs(all_actions - x))
+
+policy = sim.random_policy()
+
+## Solve by regular simulation
+
+# * simulate
+
+print('Sampling ...')
+samples = sim.simulate(horizon, policy, runs)
+print('Return from samples:', samples.statistics(sim.discount)['mean_return'])
+
 narrow_samples = raam.samples.SampleView(samples,
                     decmap = decmap,
                     expmap = expmap ,
                     actmap=raam.identity)
 
-discretization = 50
-
-#** for narrow samples
-# decision state: soc, priceindex
-decagg_big = raam.features.GridAggregation( \
-                    ((0,config['initial_capacity']), (0,config['price_sell'].shape[0])),\
-                    (discretization, config['price_sell'].shape[0]) )
-
-# expectation state: soc, priceindex, reward 
-expagg = raam.features.GridAggregation( \
-                    ((0,config['initial_capacity']), (0,config['price_sell'].shape[0]), (-2.5,2.5)), \
-                    (3*discretization, config['price_sell'].shape[0], 200) )
-
-
-## Build SRMDP
-
-dab = lambda x: decagg_big.classify(x,True)     
-
-das = lambda x: 0
-
-ea = lambda x: expagg.classify(x,True)
-
-#TODO: The actions need to be mapped
-aa = lambda x : x
 
 srmdp = crobust.SRoMDP(0,sim.discount)
-srmdp.from_samples(narrow_samples,dab,das,ea,aa)
-
-## Solve RMDP
-
+srmdp.from_samples(narrow_samples,decagg_big=dab,decagg_small=das,expagg=ea,actagg=aa)
 rmdp = srmdp.rmdp
 
-print('Optimizing robust policy ...')
-rmdp.set_uniform_distributions(1.0)
-rob_valfun,rob_policy_vec,rob_residual,rob_iterations = rmdp.mpi_jac_l1(300,maxresidual=1e-4,stype=0)
-print('Residual', rob_residual)
-
-print('Optimizing average policy ...')
-rmdp.set_uniform_distributions(0.0)
-avg_valfun,avg_policy_vec,avg_residual,avg_iterations = rmdp.mpi_jac(300,maxresidual=1e-4, stype=2)
-print('Residual', avg_residual)
-
-print('Optimizing optimistic policy ...')
-rmdp.set_uniform_distributions(1.0)
-opt_valfun,opt_policy_vec,opt_residual,opt_iterations = rmdp.mpi_jac_l1(300,maxresidual=1e-4, stype=1)
-print('Residual', opt_residual)
-
+print('Solving aggregated MDP...')
+valfun,policy_vec,residual,iterations = rmdp.mpi_jac(300,maxresidual=1e-4,stype=0)
 
 print('Constructing policies ...')
-rob_policy_vec_dec = srmdp.decpolicy(len(decagg_big), rob_policy_vec)
-opt_policy_vec_dec = srmdp.decpolicy(len(decagg_big), opt_policy_vec)
-avg_policy_vec_dec = srmdp.decpolicy(len(decagg_big), avg_policy_vec)
+policy_vec_dec = srmdp.decpolicy(len(decagg_big), policy_vec)
+policy = raam.vec2policy(policy_vec_dec, all_actions, lambda x: dab(decmap(x)),0)
 
-#TODO: this action description is wrong
-rob_policy = raam.vec2policy(rob_policy_vec_dec, [0,1], lambda x: dab(decmap(x)),0)
-opt_policy = raam.vec2policy(opt_policy_vec_dec, [0,1], lambda x: dab(decmap(x)),0)
-avg_policy = raam.vec2policy(avg_policy_vec_dec, [0,1], lambda x: dab(decmap(x)),0)
- 
-## Evaluate the computed policy
 
-optimized_samples = sim.simulate(horizon, rob_policy, runs)
-print('Optimized policy:', optimized_samples.statistics(sim.discount)['mean_return'])
+## Solve by discounted simulation
+
+# * simulate
+
+print('Sampling ...')
+samples = sim.simulate(1000, policy, runs, probterm=1-sim.discount)
+print('Return from samples:', samples.statistics(1)['mean_return'])
+
+narrow_samples = raam.samples.SampleView(samples,
+                    decmap = decmap,
+                    expmap = expmap ,
+                    actmap=raam.identity)
+
+
+srmdp = crobust.SRoMDP(0,sim.discount)
+srmdp.from_samples(narrow_samples,decagg_big=dab,decagg_small=das,expagg=ea,actagg=aa)
+rmdp = srmdp.rmdp
+
+print('Solving aggregated MDP...')
+valfun,policy_vec,residual,iterations = rmdp.mpi_jac(300,maxresidual=1e-4,stype=0)
+
+print('Constructing policies ...')
+policy_vec_dec = srmdp.decpolicy(len(decagg_big), policy_vec)
+policy = raam.vec2policy(policy_vec_dec, all_actions, lambda x: dab(decmap(x)),0)
+
+
+## Optimize thresholds
+
+import optimize_thresholds
+
+optimize_thresholds.optimize_independently(sim, horizon=100)
