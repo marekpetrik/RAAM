@@ -743,6 +743,12 @@ class SRoMDP:
             Aggregation function for actions. The function should return an integer 
             (could be negative).
         
+        
+        Note
+        ----
+        If the aggregation functions return a floating point then the number is
+        rounded to an integer and used as the index of the state or the action. 
+        
         See Also
         --------
         decvalue
