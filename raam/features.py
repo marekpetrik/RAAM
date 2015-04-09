@@ -177,7 +177,7 @@ class GridAggregation:
             ind = bisect.bisect(g,i) -1
             if ind >= len(g) - 1 or ind < 0:
                 if range_error:
-                    raise ValueError('Index is outside of the bounds for state: %s.' % str(state))
+                    raise ValueError('Index value %s is outside of the bounds for state: %s.' % (str(i),str(state)))
                 else:
                     ind = min(max(ind,0),len(g)-2)
             

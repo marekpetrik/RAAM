@@ -15,8 +15,10 @@ class Counter(raam.simulator.Simulator):
     Expectation state: position in chain, change (+1,-1)
     Initial (decision) state: 0
     Actions: {plus, minus}
-    Rewards: 90%: next position, 10% this position in chain
-     """
+    Rewards: succ_prob%: next position, 1-succ_prob% this position in chain
+    """
+    def __init__(self,succ_prob=0.9):
+        self.succ_prob = succ_prob
 
     @property
     def discount(self):
@@ -32,7 +34,7 @@ class Counter(raam.simulator.Simulator):
         
     def transition_exp(self,expstate):
         pos,act = expstate
-        if random.random() <= 0.9:
+        if random.random() <= self.succ_prob:
             return pos,pos + act
         else:
             return pos,pos
@@ -53,11 +55,12 @@ class StatefulCounter(raam.simulator.StatefulSimulator):
     Expectation state: position in chain, change (+1,-1)
     Initial (decision) state: 0
     Actions: {plus, minus}
-    Rewards: 90%: next position, 10% this position in chain
+    Rewards: succ_prob%: next position, 1-succ_prob% this position in chain
     """
 
-    def __init__(self):
+    def __init__(self, succ_prob=0.9):
         self.state = None
+        self.succ_prob = succ_prob
 
     @property
     def discount(self):
@@ -78,7 +81,7 @@ class StatefulCounter(raam.simulator.StatefulSimulator):
     def transition_exp(self):        
         pos,act = self.state
 
-        if random.random() <= 0.9:
+        if random.random() <= self.succ_prob:
             self.state = pos + act
         else:
             self.state = pos            

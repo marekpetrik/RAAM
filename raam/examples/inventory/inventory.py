@@ -1,18 +1,11 @@
-"""
-=============================================================================
-Energy arbitrage with degradable storage (:mod:`raam.examples.inventory`)
-=============================================================================
-
-Models an invetory problem with multiple price levels, sales, purchases. The storage
-is assumed to degrade with use. This can be used to model battery energy storage
-with the battery degrading while in use.
-"""
 import numpy as np
 import scipy as sp
 import itertools
 import raam
 import pickle
 from raam import features
+
+epsilon = 1e-10
 
 def degradation(fun,charge,discharge):
     """
@@ -59,7 +52,7 @@ DefaultConfiguration = {
     "price_probabilities" : np.array([[0.8, 0.1, 0.1],[0.1, 0.8, 0.1],[0.1, 0.1, 0.8]]),
     "initial_capacity" : 1,
     "initial_inventory" : 0.5,
-    "degradation" : {"fun":"polynomial","charge":[0,0,0.01],"discharge":[0.01,-0.02,0.01]},
+    "degradation" : {"fun":"polynomial","charge":[0,0,0.01],"discharge":[0.01,0.02,0.01]},
     "capacity_cost" : 1,
     "change_capacity" : True
     }
@@ -84,6 +77,7 @@ class Simulator(raam.Simulator):
         - reward
     
     Action: charge change
+        This is not an index but an absolute value of the charge change
 
     Parameters
     ----------
@@ -91,14 +85,20 @@ class Simulator(raam.Simulator):
         Configuration. See DefaultConfiguration for an example
     discount : float, optional
         Discount factor
+    action_step : float, optional
+        Discretization step for actions. This is an absolute number and should
+        scale with the size of the storage.
     """
 
-    def __init__(self,config,discount=0.9999):
+    def __init__(self,config,discount=0.9999,action_step=0.05):
         """ 
         If no filename and no configuration are provided, 
         then the configuration is created automatically 
         """
-        self.discount = discount
+        
+        self._discount = discount
+        self._action_step = action_step
+        
         self.degradation = degradation(**config['degradation'])
         self.initial_capacity = config['initial_capacity']
         self.price_buy = config['price_buy']
@@ -120,7 +120,7 @@ class Simulator(raam.Simulator):
 
     @property
     def discount(self):
-        return self.discount
+        return self._discount
 
     def transition_dec(self,decstate,action):
         """ 
@@ -191,8 +191,18 @@ class Simulator(raam.Simulator):
         return (reward,(inventory,capacity,priceindex))
 
     def actions(self,decstate):
+        """
+        List of applicable actions in the state
+        """
         inventory, capacity, _ = decstate
-        return np.arange(-inventory, capacity - inventory, 0.05)
+        return np.arange(-inventory, capacity - inventory + epsilon, self._action_step)
+
+    def all_actions(self):
+        """
+        List of all possible actions (charge and discharge capacities)
+        """
+        return np.arange(-self.initial_capacity, self.initial_capacity + epsilon, \
+                            self._action_step)
 
     def stateiterator(self):
         expstate = (self.initial_inventory,self.initial_capacity,0,0)
@@ -250,6 +260,118 @@ def threshold_policy(lowers, uppers, simulator):
     
     return policy
 
+## Threshold Optimization Functions
+
+import math
+import random
+ 
+_epsilon = 1e-6
+
+def _eval_dimchange(sim,lowers,uppers,dim,l,u,horizon,runs):
+    """ Evaluates the dimension change impact """
+    dim_lowers = lowers.copy()
+    dim_uppers = uppers.copy()
+    
+    dim_lowers[dim] = l
+    dim_uppers[dim] = u
+    
+    policy = raam.examples.inventory.threshold_policy(dim_lowers, dim_uppers, sim)
+    
+    # Common random numbers for the evaluation!
+    np.random.seed(0)
+    random.seed(0)
+    
+    samples = sim.simulate(horizon,policy,runs)
+    
+    print('.', end='')
+    return samples.statistics(sim.discount)['mean_return']
+
+
+def optimize_jointly(sim,step=0.1,horizon=600,runs=5):
+    """
+    Jointly optimizes uppen and lower thresholds for charging and discharging for 
+    each dimension.
+    
+    It can be shown (a publication pending) that this method will compute
+    the optimal solution when there is no degradation in the battery.
+    """
+    
+    values = [(l,u) for l in np.arange(0,1+step/2,step) for u in np.arange(l,1+step/2,step) ]
+    
+    # copy the lower and upper bounds
+    lowers = np.zeros(len(sim.price_buy))    # lower thresholds
+    uppers = np.ones(len(sim.price_buy))     # upper thresholds
+   
+    for iteration in range(10):
+        print('Lowers', lowers)
+        print('Uppers', uppers)
+        
+        for dimension in range(len(sim.price_sell)):
+            print('Dimension', dimension)
+            returns = [_eval_dimchange(sim,lowers,uppers,dimension,l,u,horizon,runs) for (l,u) in values]
+            
+            maxindex = np.argmax(returns)
+            
+            print('\n', returns[maxindex])
+            l,u = values[maxindex]
+            lowers[dimension] = l
+            uppers[dimension] = u
+    
+    print('Lowers', lowers)
+    print('Uppers', uppers)
+
+
+def optimize_independently(sim,step=0.1,horizon=600,runs=5):
+    """
+    Optimizes the upper and lower thresholds independently. It is not clear 
+    that this method actually computes the optimal policy        
+    """
+    
+    # copy the lower and upper bounds
+    lowers = 0.5*np.ones(len(sim.price_buy))    # lower thresholds
+    uppers = 0.5*np.ones(len(sim.price_buy))     # upper thresholds
+    
+    
+    for iteration in range(10):
+        print('Lowers', lowers)
+        print('Uppers', uppers)
+        
+        weight = 1.0 / math.sqrt(iteration + 1)
+        
+        for dimension in range(len(sim.price_sell)):
+            print('Dimension', dimension)
+            
+            print('   lowers')
+            values = np.arange(0,1+_epsilon,step)
+            if len(values) > 0:
+                returns = [_eval_dimchange(sim,lowers,uppers,dimension,\
+                            l,max(l,uppers[dimension]),horizon,runs)\
+                             for l in values]
+                maxindex = np.argmax(returns)
+                l = values[maxindex]
+                lowers[dimension] = weight * l + (1-weight)*lowers[dimension]
+                uppers[dimension] = max(uppers[dimension],lowers[dimension])
+                assert lowers[dimension] <= uppers[dimension]
+            
+                print('\n',returns[maxindex])
+            
+            print('\n   uppers')
+            values = np.arange(0,1+_epsilon,step)
+            if len(values) > 0:
+                returns = [_eval_dimchange(sim,lowers,uppers,dimension,\
+                            min(lowers[dimension],u),u,horizon,runs) \
+                            for u in values]
+                maxindex = np.argmax(returns)
+                u = values[maxindex]
+                uppers[dimension] = weight*u + (1-weight)*uppers[dimension]
+                lowers[dimension] = min(lowers[dimension],uppers[dimension])
+                assert lowers[dimension] <= uppers[dimension]
+            
+                print('\n',returns[maxindex])
+
+    print('Lowers', lowers)
+    print('Uppers', uppers)
+
 
 ## Plotting functions
 
@@ -288,3 +410,86 @@ def plot_degradation(degrad, ex_inventories = [0.1,0.5,0.9],delta=None):
     
     pp.legend(loc=9)
     pp.grid()
+
+
+## End to end construction helper functions
+
+def makesimulator(discretization,discount,action_step=0.1):
+    """
+    Constructs an inventory simulator and helper functions to simplify the 
+    construction of the sampled MDP. The prices are constructed using the 
+    martingale price evolution.
+    
+    The inventory level is discretized according to the provided parameter.
+
+    Parameters
+    ----------
+    discretization : int
+        Number of steps to discretize the inventory values to
+    
+    Returns
+    -------
+    sim : raam.Simulator
+        Simulation object
+    create_srmdp : function
+        Function that creates an srmdp from the samples
+    create_policy : function
+        Function that creates a function policy from the result vector
+    """
+    
+    from raam import crobust
+    
+    epsilon = 1e-6                  # small value to deal with numertical issues
+    
+    # problem configuration
+    config = raam.examples.inventory.configuration.construct_martingale(np.arange(5), 5)
+    config['change_capacity'] = True
+    sim = raam.examples.inventory.Simulator(config,action_step=action_step,discount=discount)
+    
+    # construct the set of possible actions and map them to indexes
+    all_actions = sim.all_actions()
+    
+    def decmap(s):
+        soc,capacity,priceindex = s
+        assert type(priceindex) == int or type(priceindex) == np.int64
+        return (soc,priceindex)
+        
+    def expmap(s):
+        soc,capacity,priceindex,reward = s
+        return (soc,capacity,reward)
+    
+        
+    #** for narrow samples
+    # decision state: soc, priceindex
+    decagg_big = raam.features.GridAggregation( \
+                        ((0,config['initial_capacity']+epsilon), (0,config['price_sell'].shape[0])),\
+                        (discretization, config['price_sell'].shape[0]) )
+    
+    # expectation state: soc, priceindex, reward 
+    expagg = raam.features.GridAggregation( \
+                        ((0,config['initial_capacity']+epsilon), (0,config['price_sell'].shape[0]), (-5,5)), \
+                        (3*discretization, config['price_sell'].shape[0], 200) )
+    
+    # assign an index to a decision states
+    dab = lambda x: decagg_big.classify(x,True)     
+    # assign an index to an expectation state
+    ea = lambda x: expagg.classify(x,True)
+    # used to represent the worst case for decision states, not used here
+    das = lambda x: 0
+    # used to represent the worst case for decision states
+    aa = lambda x : np.argmin(np.abs(all_actions - x))
+
+    # a helper function that constructs SRMDP from the samples
+    def create_srmdp(samples):
+        narrow_samples = raam.samples.SampleView(samples, decmap = decmap,
+                    expmap = expmap, actmap=raam.identity)
+        srmdp = crobust.SRoMDP(0,sim.discount)
+        srmdp.from_samples(narrow_samples,decagg_big=dab,decagg_small=das,expagg=ea,actagg=aa)
+        return srmdp
+        
+    def create_policy(srmdp, policy_vec):
+        policy_vec_dec = srmdp.decpolicy(len(decagg_big), policy_vec)
+        policy = raam.vec2policy(policy_vec_dec, all_actions, lambda x: dab(decmap(x)),0)
+        return policy
+        
+    return sim, create_srmdp, create_policy

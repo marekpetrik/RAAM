@@ -140,13 +140,11 @@ class Samples(metaclass=abc.ABCMeta):
     
     def merge(self, samples):
         """ 
-        Merges samples from multiple sets.
+        Merges samples from another set into this one.
     
         Parameters
         ----------
-        self : dict
-            The first set of samples
-        samples2 : Samples
+        samples : Samples
             The second set of samples
         """
         for d in samples.decsamples():
@@ -383,7 +381,7 @@ class MemSamples(Samples):
 identity = lambda x: x
 class SampleView(Samples):
     """
-    Transforms samples to a different view. Can be used to add and remove
+    Transforms samples to a different view. Can be used to add and retrieve
     samples using a different format.
     
     Parameters
