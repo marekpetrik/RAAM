@@ -2,17 +2,15 @@
 Compute optimal thresholds for the given configuration
 """
 
-# cd Articles/batteries/python/optimization
-
 import raam.examples
 import configuration
 import numpy as np
 import random 
 import math
 
-epsilon = 1e-6
+_epsilon = 1e-6
 
-def eval_dimchange(sim,lowers,uppers,dim,l,u,horizon,runs):
+def _eval_dimchange(sim,lowers,uppers,dim,l,u,horizon,runs):
     """ Evaluates the dimension change impact """
     dim_lowers = lowers.copy()
     dim_uppers = uppers.copy()
@@ -22,7 +20,7 @@ def eval_dimchange(sim,lowers,uppers,dim,l,u,horizon,runs):
     
     policy = raam.examples.inventory.threshold_policy(dim_lowers, dim_uppers, sim)
     
-    # Common random numbers!
+    # Common random numbers for the evaluation!
     np.random.seed(0)
     random.seed(0)
     
@@ -32,9 +30,15 @@ def eval_dimchange(sim,lowers,uppers,dim,l,u,horizon,runs):
     return samples.statistics(sim.discount)['mean_return']
 
 
-# Joint optimization
-
 def optimize_jointly(sim,step=0.1,horizon=600,runs=5):
+    """
+    Jointly optimizes uppen and lower thresholds for charging and discharging for 
+    each dimension.
+    
+    It can be shown (a publication pending) that this method will compute
+    the optimal solution when the battery degradation function satisfies some
+    somewhat restrictive properties.
+    """
     
     values = [(l,u) for l in np.arange(0,1+step/2,step) for u in np.arange(l,1+step/2,step) ]
     
@@ -48,7 +52,7 @@ def optimize_jointly(sim,step=0.1,horizon=600,runs=5):
         
         for dimension in range(len(sim.price_sell)):
             print('Dimension', dimension)
-            returns = [eval_dimchange(sim,lowers,uppers,dimension,l,u,horizon,runs) for (l,u) in values]
+            returns = [_eval_dimchange(sim,lowers,uppers,dimension,l,u,horizon,runs) for (l,u) in values]
             
             maxindex = np.argmax(returns)
             
@@ -60,13 +64,11 @@ def optimize_jointly(sim,step=0.1,horizon=600,runs=5):
     print('Lowers', lowers)
     print('Uppers', uppers)
 
-# Optimize thresholds - one at a time
-
-
 
 def optimize_independently(sim,step=0.1,horizon=600,runs=5):
     """
-    It is not clear that this actually computes the optimal policy        
+    Optimizes the upper and lower thresholds independently. It is not clear 
+    that this method actually computes the optimal policy        
     """
     
     # copy the lower and upper bounds
@@ -84,9 +86,9 @@ def optimize_independently(sim,step=0.1,horizon=600,runs=5):
             print('Dimension', dimension)
             
             print('   lowers')
-            values = np.arange(0,1+epsilon,step)
+            values = np.arange(0,1+_epsilon,step)
             if len(values) > 0:
-                returns = [eval_dimchange(sim,lowers,uppers,dimension,\
+                returns = [_eval_dimchange(sim,lowers,uppers,dimension,\
                             l,max(l,uppers[dimension]),horizon,runs)\
                              for l in values]
                 maxindex = np.argmax(returns)
@@ -98,9 +100,9 @@ def optimize_independently(sim,step=0.1,horizon=600,runs=5):
                 print('\n',returns[maxindex])
             
             print('\n   uppers')
-            values = np.arange(0,1+epsilon,step)
+            values = np.arange(0,1+_epsilon,step)
             if len(values) > 0:
-                returns = [eval_dimchange(sim,lowers,uppers,dimension,\
+                returns = [_eval_dimchange(sim,lowers,uppers,dimension,\
                             min(lowers[dimension],u),u,horizon,runs) \
                             for u in values]
                 maxindex = np.argmax(returns)
@@ -113,8 +115,6 @@ def optimize_independently(sim,step=0.1,horizon=600,runs=5):
 
     print('Lowers', lowers)
     print('Uppers', uppers)
-            
-# Main code
 
 if __name__ == '__main__':
     

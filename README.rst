@@ -228,6 +228,8 @@ And finally, the samples are used to construct an sampled robust MDP. Even and o
 
 Note that it is important to map the value function and policy in the last two lines. This is because the sampled robust MDP uses an internal representation that separates decision and expectation states in order to improve computational efficiency.
 
+More examples are provided in the subdirectory ``examples``.
+
 References
 ----------
 
