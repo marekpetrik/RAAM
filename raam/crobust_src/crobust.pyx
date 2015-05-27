@@ -692,10 +692,11 @@ class SRoMDP:
         # state mappings
         self.rmdp = RoMDP(states,sqrt(discount))
         self.discount = discount
-        self.statemaps = StateMaps({},{},{})
+        self.statemaps = StateMaps({},{},{},{})
                             # decstate2state
                             # expstate2state
                             # decstate2outcome
+                            # expstate2outcome
         
         # the following dictionaries are used in order to properly weigh samples 
         # when added multiple times
@@ -708,7 +709,8 @@ class SRoMDP:
         self.ecount_sao = {} # maps state,action,outcome to the number of observations
             # this is uses to combine multiple samples
     
-    def from_samples(self, samples, decagg_big, decagg_small, expagg, actagg):
+    def from_samples(self, samples, decagg_big, decagg_small, \
+                        expagg_big, expagg_small, actagg):
         """
         Loads data to the MDP from the provided samples given aggregation functions.
         Each decision state that belongs to a single aggregated state corresponds 
@@ -728,21 +730,23 @@ class SRoMDP:
             actual aggregation. The function should return an integer 
             (could be negative).
         decagg_small : function
-            Aggregation function used to construct outcomes. The solution is 
+            Aggregation function used to construct outcomes and the value is 
+            relative to the state given by ``decagg_big``. The solution is 
             computed as the worst-case over these outcomes. This can be just a
             finer aggregation function than decagg_big, or could come from 
             multiple runs. The function should return an integer 
-            (could be negative). Use features.IdCache to simply use the state
+            (could be negative). Use ``features.IdCache`` to simply use the state
             identity.
-        expagg : function
+        expagg_big : function
             Aggregation function for expectation states. This is used to average
             the transition probabilities. The function should return an integer 
             (could be negative). Use features.IdCache to simply use the state
             identity.
+        expagg_small : function
+            Aggregation function used to construct outcomes for expectation states.
         actagg : function
             Aggregation function for actions. The function should return an integer 
             (could be negative).
-        
         
         Note
         ----
@@ -758,16 +762,22 @@ class SRoMDP:
         
         cdef long mdpstates = self.rmdp.state_count()
         
+        # maps decision states (aggregated) to the states of the RMDP
         decstate2state = self.statemaps.decstate2state
+        # maps expectation states (aggregated) to the states of the RMDP
         expstate2state = self.statemaps.expstate2state
+        # maps decision states (small aggregation) to the outcomes in the MDP
         decstate2outcome = self.statemaps.decstate2outcome
+        # maps expectation states (small aggregated) to the outcomes in the MDP
+        expstate2outcome = self.statemaps.expstate2outcome
         
         cdef RoMDP rmdp = self.rmdp
         
         dcount_sao_old = self.dcount_sao.copy()
+        
         ecount_sao_old = self.ecount_sao.copy()
         
-        # process decision samples
+        # *** process decision samples
         for ds in samples.decsamples():
             
             # compute the mdp state for the decision state
@@ -813,7 +823,7 @@ class SRoMDP:
             weight = 1.0 / float(dcount_sao_old.get(sao,1))
             rmdp.add_transition(numdecstate,numaction,numoutcome,numexpstate,weight,0.0)
             
-        # process expectation samples
+        # *** process expectation samples
         # one action and outcome per state
         for es in samples.expsamples():
             # compute the mdp state for the expectation state
