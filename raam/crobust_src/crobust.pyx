@@ -89,7 +89,8 @@ cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
 
 
 # a contained used to hold the dictionaries used to map sample states to MDP states
-StateMaps = namedtuple('StateMaps',['decstate2state','expstate2state','decstate2outcome'])
+StateMaps = namedtuple('StateMaps',['decstate2state','expstate2state',\
+                                    'decstate2outcome','expstate2outcome'])
 
 cdef class RoMDP:
     """
@@ -744,6 +745,8 @@ class SRoMDP:
             identity.
         expagg_small : function
             Aggregation function used to construct outcomes for expectation states.
+            The function can be ``None`` which means that all expectation states
+            are aggregated into one.
         actagg : function
             Aggregation function for actions. The function should return an integer 
             (could be negative).
@@ -757,18 +760,23 @@ class SRoMDP:
         --------
         decvalue
         """
-        cdef long aggds_big, aggds_small, agges
+        cdef long aggds_big, aggds_small, agges_big, agges_small
         cdef long numdecstate, numexpstate, numaction, numoutcome
         
         cdef long mdpstates = self.rmdp.state_count()
+        
+        # if there is no small aggregation provided, then just assume that there 
+        # is no aggregation
+        if expagg_small is None:
+            expagg_small = lambda x: 0
         
         # maps decision states (aggregated) to the states of the RMDP
         decstate2state = self.statemaps.decstate2state
         # maps expectation states (aggregated) to the states of the RMDP
         expstate2state = self.statemaps.expstate2state
-        # maps decision states (small aggregation) to the outcomes in the MDP
+        # maps decision states (small aggregation) to dictionaries of outcomes in the MDP
         decstate2outcome = self.statemaps.decstate2outcome
-        # maps expectation states (small aggregated) to the outcomes in the MDP
+        # maps expectation states (small aggregated) to  outcomes in the MDP
         expstate2outcome = self.statemaps.expstate2outcome
         
         cdef RoMDP rmdp = self.rmdp
@@ -790,13 +798,13 @@ class SRoMDP:
                 decstate2state[aggds_big] = numdecstate
             
             # compute the mdp state for the expectation state
-            agges = expagg(ds.expStateTo)
-            if agges in expstate2state:
-                numexpstate = expstate2state[agges]
+            agges_big = expagg_big(ds.expStateTo)
+            if agges_big in expstate2state:
+                numexpstate = expstate2state[agges_big]
             else:
                 numexpstate = mdpstates
                 mdpstates += 1
-                expstate2state[agges] = numexpstate
+                expstate2state[agges_big] = numexpstate
             
             # compute action aggregation, the mapping is 1->1
             numaction = actagg(ds.action)
@@ -804,7 +812,7 @@ class SRoMDP:
             # compute the outcome aggregation
             aggds_small = decagg_small(ds.decStateFrom)
             
-            outcomedict = decstate2outcome.get((aggds_big,numaction),None)
+            outcomedict = decstate2outcome.get((aggds_big,numaction), None)
             if outcomedict is None:
                 outcomedict = {}
                 decstate2outcome[(aggds_big,numaction)] = outcomedict
@@ -814,12 +822,14 @@ class SRoMDP:
             else:
                 numoutcome = len(outcomedict)
                 outcomedict[aggds_small] = numoutcome
-                
+
+            # update the counts for the sample
             sao = (numdecstate,numaction,numoutcome)
             self.dcount_sao[sao] = self.dcount_sao.get(sao,0) + 1
             
             # now, just add the transition
-            # use the old counts to compute the weights
+            # use the old counts to compute the weight in order for the normalization
+            # to work
             weight = 1.0 / float(dcount_sao_old.get(sao,1))
             rmdp.add_transition(numdecstate,numaction,numoutcome,numexpstate,weight,0.0)
             
@@ -827,13 +837,13 @@ class SRoMDP:
         # one action and outcome per state
         for es in samples.expsamples():
             # compute the mdp state for the expectation state
-            agges = expagg(es.expStateFrom)
-            if agges in expstate2state:
-                numexpstate = expstate2state[agges]
+            agges_big = expagg_big(es.expStateFrom)
+            if agges_big in expstate2state:
+                numexpstate = expstate2state[agges_big]
             else:
                 numexpstate = mdpstates
                 mdpstates += 1
-                expstate2state[agges] = numexpstate
+                expstate2state[agges_big] = numexpstate
 
             # compute the mdp state for the decision state
             aggds_big = decagg_big(es.decStateTo)
@@ -843,25 +853,38 @@ class SRoMDP:
                 numdecstate = mdpstates
                 mdpstates += 1
                 decstate2state[aggds_big] = numdecstate
-
+            
             # compute action aggregation
             numaction = 0   # only one action
             
             # compute the outcome aggregation
-            numoutcome = 0  # only one outcome
+            agges_small = expagg_small(es.expStateFrom)
+            
+            outcomedict = expstate2outcome.get(agges_big, None)
+            
+            if outcomedict is None:
+                outcomedict = {}
+                expstate2outcome[agges_big] = outcomedict
                 
-        
-            self.ecount_sao[numexpstate] = self.ecount_sao.get(numexpstate,0) + 1
+            if agges_small in outcomedict:
+                numoutcome = outcomedict[agges_small]
+            else:
+                numoutcome = len(outcomedict)
+                outcomedict[agges_small] = numoutcome
+
+            # update the counts for the sample
+            so = (numexpstate,numoutcome)
+            self.ecount_sao[so] = self.ecount_sao.get(so,0) + 1
             
             # now, just add the transition
-            # use the old weights to compute the counts
-            weight = 1.0 / float(ecount_sao_old.get(numexpstate,1))    
+            # use the old counts to compute the weight in order for the normalization
+            # to work
+            weight = 1.0 / float(ecount_sao_old.get(so,1))    
                 
             # now, just add the transition
             self.rmdp.add_transition(numexpstate,numaction,numoutcome,numdecstate,\
                             weight*es.weight,es.reward)
             
-        
         # add a transition to a bad state for state-actions with no outcomes
         # these state-action pairs are created automatically 
         cdef double bad = -float('inf')
@@ -873,7 +896,7 @@ class SRoMDP:
                 if self.rmdp.outcome_count(numstate,numaction) == 0:
                     self.rmdp.add_transition(numstate,numaction,0,numbadstate,1.0,bad)
         
-        # normalize transitions
+        # normalize transition weights
         self.rmdp.normalize()
                 
     def decvalue(self,states,value,minstate=0):

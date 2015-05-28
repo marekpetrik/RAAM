@@ -1075,7 +1075,7 @@ class RobustFromSamples(unittest.TestCase):
 
         l = itemgetter(0)
 
-        r.from_samples(m,decagg_big=l,decagg_small=l,expagg=l,actagg=l)
+        r.from_samples(m,decagg_big=l,decagg_small=l,expagg_big=l,actagg=l,expagg_small=None)
         
         r.rmdp.set_uniform_distributions(1.0)
         v = r.rmdp.vi_jac(1000,stype=2)[0]
@@ -1128,8 +1128,8 @@ class RobustFromSamples(unittest.TestCase):
             
         # test one order
         r = crobust.SRoMDP(2,0.9)
-        r.from_samples(m1,decagg_big=l,decagg_small=s,expagg=l,actagg=l)
-        r.from_samples(m2,decagg_big=l,decagg_small=s,expagg=l,actagg=l)
+        r.from_samples(m1,decagg_big=l,decagg_small=s,expagg_big=l,actagg=l,expagg_small=None)
+        r.from_samples(m2,decagg_big=l,decagg_small=s,expagg_big=l,actagg=l,expagg_small=None)
 
         r.rmdp.set_uniform_distributions(0.0)
         v = r.rmdp.vi_jac(3000,stype=2)[0]
@@ -1145,7 +1145,7 @@ class RobustFromSamples(unittest.TestCase):
         m.merge(m2)
 
         r = crobust.SRoMDP(2,0.9)
-        r.from_samples(m,decagg_big=l,decagg_small=s,expagg=l,actagg=l)
+        r.from_samples(m,decagg_big=l,decagg_small=s,expagg_big=l,actagg=l,expagg_small=None)
         
         r.rmdp.set_uniform_distributions(0.0)
         v = r.rmdp.vi_jac(3000,stype=2)[0]
@@ -1157,8 +1157,8 @@ class RobustFromSamples(unittest.TestCase):
 
         # test reversed order
         r = crobust.SRoMDP(2,0.9)
-        r.from_samples(m2,decagg_big=l,decagg_small=s,expagg=l,actagg=l)
-        r.from_samples(m1,decagg_big=l,decagg_small=s,expagg=l,actagg=l)
+        r.from_samples(m2,decagg_big=l,decagg_small=s,expagg_big=l,actagg=l,expagg_small=None)
+        r.from_samples(m1,decagg_big=l,decagg_small=s,expagg_big=l,actagg=l,expagg_small=None)
         
         r.rmdp.set_uniform_distributions(0.0)
         v = r.rmdp.vi_jac(3000,stype=2)[0]
