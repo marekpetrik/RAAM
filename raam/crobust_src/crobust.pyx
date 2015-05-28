@@ -687,6 +687,14 @@ class SRoMDP:
     Robust MDP constructed from samples and an aggregation.
     
     See :method:`from_samples` for the description of basic usage.
+    
+    Parameters
+    ----------
+    states : int
+        Initial number of states. State space is automaticaly expanded when more
+        samples become available.
+    discount : float
+        Discount factor used in the MDP.
     """
     
     def __init__(self,states,discount):
