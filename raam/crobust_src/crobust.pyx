@@ -41,7 +41,7 @@ cdef extern from "../../craam/include/RMDP.hpp":
 
         void set_distribution(long fromid, long actionid, const vector[double] & distribution, double threshold) except +
         void set_uniform_distribution(double threshold);
-        void set_thresholds(double threshold) except +
+        void set_uniform_thresholds(double threshold) except +
 
         void normalize()
 
@@ -198,7 +198,7 @@ cdef class RoMDP:
         """
         self.thisptr.set_uniform_distribution(threshold)
 
-    cpdef set_thresholds(self, double threshold):
+    cpdef set_uniform_thresholds(self, double threshold):
         """
         Sets the same threshold for all states.
         
@@ -209,7 +209,7 @@ cdef class RoMDP:
         --------
         self.set_distribution
         """
-        self.thisptr.set_thresholds(threshold)
+        self.thisptr.set_uniform_thresholds(threshold)
 
     cpdef vi_gs(self, int iterations, valuefunction = np.empty(0), \
                             double maxresidual = 0, int stype=0):

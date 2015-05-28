@@ -1006,22 +1006,22 @@ class RobustRecommender(unittest.TestCase):
         self._check_vrobust(v[0])
     
     def test_l1_worst(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_gs_l1(1000)
         self._check_vrobust(v[0])
     
     def test_l1_worst_with_residual(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_gs_l1(10000, maxresidual=0.0001)
         self._check_vrobust(v[0])
     
     def test_l1_worst_with_replace(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_jac_l1(1000)
         self._check_vrobust(v[0])
     
     def test_l1_worst_with_residual_and_replace(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001)
         self._check_vrobust(v[0])
         
@@ -1032,22 +1032,22 @@ class RobustRecommender(unittest.TestCase):
         self._check_vrobust(values)
     
     def test_l1_half(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_gs_l1(1000)
         self._check_vrobust_half(v[0])
     
     def test_l1_half_with_residual(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_gs_l1(10000, maxresidual=0.0001)
         self._check_vrobust_half(v[0])
     
     def test_l1_half_with_replace(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_jac_l1(1000)
         self._check_vrobust_half(v[0])
     
     def test_l1_half_with_residual_and_replace(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001)
         self._check_vrobust_half(v[0])        
 
@@ -1222,22 +1222,22 @@ class RobustRecommenderOptimistic(unittest.TestCase):
         self._check_vrobust(v[0])
     
     def test_l1_worst(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_gs_l1(1000, stype=1)
         self._check_vrobust(v[0])
     
     def test_l1_worst_with_residual(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_gs_l1(10000, maxresidual=0.0001, stype=1)
         self._check_vrobust(v[0])
     
     def test_l1_worst_with_replace(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_jac_l1(1000, stype=1)
         self._check_vrobust(v[0])
     
     def test_l1_worst_with_residual_and_replace(self):
-        self.rmdp.set_thresholds(2)
+        self.rmdp.set_uniform_thresholds(2)
         v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001, stype=1)
         self._check_vrobust(v[0])
         
@@ -1247,22 +1247,22 @@ class RobustRecommenderOptimistic(unittest.TestCase):
         self._check_vrobust(values)
     
     def test_l1_half(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_gs_l1(1000, stype=1)
         self._check_vrobust_half(v[0])
     
     def test_l1_half_with_residual(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_gs_l1(10000, maxresidual=0.0001, stype=1)
         self._check_vrobust_half(v[0])
     
     def test_l1_half_with_replace(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_jac_l1(1000, stype=1)
         self._check_vrobust_half(v[0])
     
     def test_l1_half_with_residual_and_replace(self):
-        self.rmdp.set_thresholds(0.5)
+        self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001, stype=1)
         self._check_vrobust_half(v[0])      
     
