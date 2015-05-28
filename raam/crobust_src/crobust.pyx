@@ -10,7 +10,6 @@ from libcpp cimport bool
 import statistics
 from collections import namedtuple 
 from math import sqrt
-
 import warnings 
 
 cdef extern from "../../craam/include/RMDP.hpp":
@@ -64,6 +63,7 @@ cdef extern from "../../craam/include/RMDP.hpp":
         void transitions_to_csv_file(const string & filename, bool header) except +
 
         string to_string() except +
+
 
 cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
     """
@@ -212,7 +212,7 @@ cdef class RoMDP:
         self.thisptr.set_uniform_thresholds(threshold)
 
     cpdef vi_gs(self, int iterations, valuefunction = np.empty(0), \
-                            double maxresidual = 0, int stype=0):
+                            double maxresidual=0, int stype=0):
         """
         Runs value iteration using the worst case (simplex) distribution for the 
         outcomes.
@@ -232,7 +232,8 @@ cdef class RoMDP:
             Maximal residual at which the iterations stop. A negative value
             will ensure the necessary number of iterations.
         stype : int  {0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average solution
+            Robust (0) or optimistic (1) solution or (2) average solution. One
+            can use e.g. robust.SolutionType.Robust.value.
             
         Returns
         -------
@@ -240,6 +241,10 @@ cdef class RoMDP:
         policy : np.ndarray
         residual : double
         iterations : int
+        
+        See Also
+        --------
+        SolutionType
         """
         
         if valuefunction.shape[0] == 0:
@@ -261,7 +266,7 @@ cdef class RoMDP:
         
 
     cpdef vi_gs_l1(self, int iterations, valuefunction = np.empty(0), \
-                    double maxresidual = 0, int stype=0):
+                    double maxresidual=0, int stype=0):
         """
         Runs value iteration using the worst distribution constrained by the threshold 
         and l1 norm difference from the base distribution.
@@ -281,7 +286,8 @@ cdef class RoMDP:
             Maximal residual at which the iterations stop. A negative value
             will ensure the necessary number of iterations.
         stype : int  {0, 1, 2}, optional
-            Robust (0) or optimistic (1) solution or (2) average solution
+            Robust (0) or optimistic (1) solution or (2) average solution. One
+            can use e.g. robust.SolutionType.Robust.value.
             
         Returns
         -------
@@ -310,7 +316,7 @@ cdef class RoMDP:
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
         
     cpdef vi_jac(self, int iterations,valuefunction = np.empty(0), \
-                                    double maxresidual = 0, int stype=0):
+                                    double maxresidual=0, int stype=0):
         """
         Runs value iteration using the worst case (simplex) distribution for the 
         outcomes.
@@ -328,7 +334,8 @@ cdef class RoMDP:
             Maximal residual at which the iterations stop. A negative value
             will ensure the necessary number of iterations.
         stype : int  (0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average
+            Robust (0) or optimistic (1) solution or (2) average. One
+            can use e.g. robust.SolutionType.Robust.value.
             
         Returns
         -------
@@ -374,7 +381,8 @@ cdef class RoMDP:
             Maximal residual at which the iterations stop. A negative value
             will ensure the necessary number of iterations.
         stype : int  (0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average solution
+            Robust (0) or optimistic (1) solution or (2) average solution. One
+            can use e.g. robust.SolutionType.Robust.value.
             
         Returns
         -------
@@ -422,7 +430,8 @@ cdef class RoMDP:
         valiterations : int, optional
             Maximal number of iterations for value function computation
         stype : int  (0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average solution
+            Robust (0) or optimistic (1) solution or (2) average solution. One
+            can use e.g. robust.SolutionType.Robust.value.
             
         Returns
         -------
@@ -475,7 +484,8 @@ cdef class RoMDP:
         valiterations : int, optional
             Maximal number of iterations for value function computation
         stype : int  (0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average solution
+            Robust (0) or optimistic (1) solution or (2) average solution. One
+            can use e.g. robust.SolutionType.Robust.value.
             
         Returns
         -------
@@ -701,11 +711,9 @@ class SRoMDP:
         # state mappings
         self.rmdp = RoMDP(states,sqrt(discount))
         self.discount = discount
+        
+        # decstate2state, expstate2state, decstate2outcome, expstate2outcome
         self.statemaps = StateMaps({},{},{},{})
-                            # decstate2state
-                            # expstate2state
-                            # decstate2outcome
-                            # expstate2outcome
         
         # the following dictionaries are used in order to properly weigh samples 
         # when added multiple times
@@ -727,8 +735,9 @@ class SRoMDP:
         
         Both expectation and decision states are translated to separate RMDP states
         
-        Important: the discount factor must be sqrt(discount) for to behave as discount;
-        this correction is handled automatically by the class
+        Important: the discount factor used internally with the RoMDP must 
+        be sqrt(discount) for to behave as discount; this correction is handled 
+        automatically by the class.
         
         Parameters
         ----------
@@ -770,8 +779,8 @@ class SRoMDP:
         """
         cdef long aggds_big, aggds_small, agges_big, agges_small
         cdef long numdecstate, numexpstate, numaction, numoutcome
-        
         cdef long mdpstates = self.rmdp.state_count()
+        cdef RoMDP rmdp = self.rmdp        
         
         # if there is no small aggregation provided, then just assume that there 
         # is no aggregation
@@ -787,10 +796,7 @@ class SRoMDP:
         # maps expectation states (small aggregated) to  outcomes in the MDP
         expstate2outcome = self.statemaps.expstate2outcome
         
-        cdef RoMDP rmdp = self.rmdp
-        
         dcount_sao_old = self.dcount_sao.copy()
-        
         ecount_sao_old = self.ecount_sao.copy()
         
         # *** process decision samples
@@ -1018,3 +1024,19 @@ class SRoMDP:
         Returns the number of samples in the object
         """
         return sum(self.dcount_sao.values()) + sum(self.ecount_sao.values())
+
+    def expstate_numbers(self):
+        """
+        Returns numbers of the internal RoMDP states that correspond to the
+        expectation states.
+        """
+        return list(self.statemaps.expstate2state.values())
+        
+    def decstate_numbers(self):
+        """
+        Returns numbers of the internal RoMDP states that correspond to the
+        decision states.
+        """
+        return list(self.statemaps.decstate2state.values())
+        
+                

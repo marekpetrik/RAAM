@@ -11,6 +11,15 @@ import itertools
 from scipy import sparse
 import numpy as np
 from numpy import ma
+from enum import Enum
+
+class SolutionType(Enum):
+    """
+    Type of the solution to seek
+    """
+    Robust = 0
+    Optimistic = 1
+    Average = 2
 
 def __agg__(s):
     """ Returns the first component of the list. """
