@@ -6,6 +6,10 @@ from raam import examples
 
 import numpy as np
 
+from counter_modes import CounterModes
+
+counter = CounterModes(
+
 discount = 0.99
 samples = examples.chain.simple_samples(10,discount)
 
