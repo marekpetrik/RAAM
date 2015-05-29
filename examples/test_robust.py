@@ -21,13 +21,12 @@ def sampleindex(x):
     dict_si[x] = index + 1
     return index
     
-
 r.from_samples(samples, decagg_big=statenum, decagg_small=zero,
                 expagg_big=statenum, expagg_small=sampleindex,
                 actagg=features.IdCache())
                 
-r.rmdp.set_uniform_distributions(0.0)
+r.rmdp.set_uniform_distributions(0.4)
 
-v,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
+v,_,_,_ = r.rmdp.mpi_jac_l1(1000,stype=robust.SolutionType.Robust.value)
 
 print(r.decvalue(10, v))
