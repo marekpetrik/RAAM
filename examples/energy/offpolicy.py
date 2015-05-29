@@ -34,7 +34,7 @@ samples = sim.simulate(horizon, policy, runs, transitionlimit=sample_count)
 print('Return from samples:', samples.statistics(sim.discount)['mean_return'])
 
 print('Creating additional samples')
-# add additional samples for all states that were visted
+# add additional samples for all states that were visited
 samples = sim.sample_dec_ofdec(samples)
 samples = sim.sample_exp_ofdec(samples,extra_exp_samples)
 
