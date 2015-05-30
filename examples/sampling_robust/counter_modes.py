@@ -9,7 +9,10 @@ import numpy as np
 class CounterModes(raam.simulator.Simulator):  
     """
     A simple chain counter class with different modes. The modes differ in their 
-    transition probabilties. Modes can be changed but also may change randomly
+    transition probabilties. Modes can be changed but also may change randomly.
+    
+    It is possible to restrict which modes are allowed in the transition by 
+    setting the allowable modes.
     
     If the left-right action fails, then the next state is chosen according to 
     a randomly generated transition probability. The transition probability increases
@@ -98,7 +101,7 @@ class CounterModes(raam.simulator.Simulator):
         else:
             # make the transition randomly according to the change probability
             
-            p = self.__P[pos,:]
+            p = self.__P[mode][pos,:]
             npos = np.random.choice(np.arange(self.__statecount), p=p)
             
         # update the new mode
@@ -112,16 +115,18 @@ class CounterModes(raam.simulator.Simulator):
                 nmode = mode + 1
             elif q < self.__mode_change_prob:
                 nmode = mode - 1
+            else:
+                nmode = mode
                 
         nmode = min(max(nmode,0),self.__acceptablemodecount-1)
         
-        return (npos,nmode), self.__rewards[pos]
+        return (self.__rewards[pos], (npos,nmode))
             
     def end_condition(self,decstate):
         return False
         
     def initstates(self):
-        return itertools.cycle( (0,0) )
+        return itertools.cycle( ((0,0),) )
         
     def actions(self,decstate):
         return ['plus','minus','modeup','modedown']
