@@ -12,8 +12,10 @@ from collections import namedtuple
 from math import sqrt
 import warnings 
 
+
 cdef extern from "../../craam/include/RMDP.hpp":
-    pair[vector[double],double] worstcase_l1(const vector[double] & z, const vector[double] & q, double t)
+    pair[vector[double],double] worstcase_l1(const vector[double] & z, 
+                                            const vector[double] & q, double t)
 
     ctypedef enum SolutionType:
         Robust = 0
@@ -36,11 +38,21 @@ cdef extern from "../../craam/include/RMDP.hpp":
     cdef cppclass RMDP:
         RMDP(int state_count) except +
 
-        void add_transition(long fromid, long actionid, long outcomeid, long toid, double probability, double reward) except + 
+        void add_transition(long fromid, long actionid, long outcomeid, 
+                            long toid, double probability, double reward) except + 
 
-        void set_distribution(long fromid, long actionid, const vector[double] & distribution, double threshold) except +
+        void set_distribution(long fromid, long actionid, 
+                                const vector[double] & distribution, 
+                                double threshold) except +
         void set_uniform_distribution(double threshold);
         void set_uniform_thresholds(double threshold) except +
+
+        double get_reward(long stateid, long actionid, long outcomeid, 
+                            long sampleid) except +
+        void set_reward(long stateid, long actionid, long outcomeid, long sampleid, 
+                            double reward) except +
+        long sample_count(long stateid, long actionid, long outcomeid) except +
+
 
         void normalize()
 
@@ -653,6 +665,24 @@ cdef class RoMDP:
             Number of the action
         """
         return self.thisptr.outcome_count(stateid, actionid)
+
+    cpdef double get_reward(self, long stateid, long actionid, long outcomeid, long sampleid):
+        """
+        Returns the reward for the given state, action, and outcome
+        """
+        return self.thisptr.get_reward(stateid, actionid, outcomeid, sampleid)
+    
+    cpdef set_reward(self, long stateid, long actionid, long outcomeid, long sampleid, double reward):
+        """
+        Sets the reward for the given state, action, and outcome
+        """
+        self.thisptr.set_reward(stateid, actionid, outcomeid, sampleid, reward)
+        
+    cpdef long sample_count(self, long stateid, long actionid, long outcomeid):
+        """
+        Returns the number of samples (single-state transitions) for the action and outcome
+        """
+        return self.thisptr.sample_count(stateid, actionid, outcomeid)
 
     def list_samples(self):
         """
