@@ -12,7 +12,6 @@ from collections import namedtuple
 from math import sqrt
 import warnings 
 
-
 cdef extern from "../../craam/include/RMDP.hpp":
     pair[vector[double],double] worstcase_l1(const vector[double] & z, 
                                             const vector[double] & q, double t)
@@ -53,6 +52,8 @@ cdef extern from "../../craam/include/RMDP.hpp":
                             double reward) except +
         long sample_count(long stateid, long actionid, long outcomeid) except +
 
+        double get_threshold(long stateid, long actionid) except +
+        void set_threshold(long stateid, long actionid, double threshold) except +
 
         void normalize()
 
@@ -73,6 +74,7 @@ cdef extern from "../../craam/include/RMDP.hpp":
         Solution mpi_jac_l1(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual, SolutionType type) except +
 
         void transitions_to_csv_file(const string & filename, bool header) except +
+
 
         string to_string() except +
 
@@ -705,11 +707,17 @@ cdef class RoMDP:
 
         return result
 
+    cpdef double get_threshold(self, long stateid, long actionid):
+        """ Returns the robust threshold for a given state """
+        return self.thisptr.get_threshold(stateid, actionid)
+    
+    cpdef set_threshold(self, long stateid, long actionid, double threshold):
+        """ Sets the robust threshold for a given state """
+        self.thisptr.set_threshold(stateid, actionid, threshold)
         
     cpdef transitions_to_csv_file(self, filename, header = True):
         """ Saves the transitions to a csv file """
         self.thisptr.transitions_to_csv_file(filename, header)
-
 
     cpdef string to_string(self):
         cdef string result = self.thisptr.to_string()
