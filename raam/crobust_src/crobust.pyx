@@ -74,10 +74,9 @@ cdef extern from "../../craam/include/RMDP.hpp":
         Solution mpi_jac_l1(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual, SolutionType type) except +
 
         void transitions_to_csv_file(const string & filename, bool header) except +
-
-
         string to_string() except +
 
+        void copy_into(RMDP& target) except + 
 
 cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
     """
@@ -706,6 +705,14 @@ cdef class RoMDP:
                             tran.indices[tid], tran.probabilities[tid], tran.rewards[tid]) )
 
         return result
+
+    cpdef copy(self):
+        """
+        Makes a copy of the object
+        """
+        r = RoMDP(0, self.discount)
+        self.thisptr.copy_into( r.thisptr[0] ) 
+        return r
 
     cpdef double get_threshold(self, long stateid, long actionid):
         """ Returns the robust threshold for a given state """

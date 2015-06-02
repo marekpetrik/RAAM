@@ -20,7 +20,7 @@ decstatecount = poscount * modecount
 test_steps = 20
 test_counts = 20
 
-## Define Aggregation
+## Define state numbering
 
 # define state aggregation functions
 def decstatenum(x): 
@@ -45,7 +45,7 @@ def sampleindex(x):
 
 # get samples
 np.random.seed(0)
-samples = counter.simulate(1000, counter.random_policy(),20)
+samples = counter.simulate(1000, counter.random_policy(),200)
 
 # build the sampled MDP    
 r = crobust.SRoMDP(1,counter.discount)
@@ -61,7 +61,7 @@ v,pol,_,_ = r.rmdp.mpi_jac(5000,stype=robust.SolutionType.Average.value)
 optdecvalue = r.decvalue(decstatecount, v)
 optdecpolicy = r.decpolicy(decstatecount, pol)
 
-print('Optimal value function', optdecvalue.reshape(modecount, poscount).T)
+print('Optimal value function\n', optdecvalue.reshape(modecount, poscount).T)
 print('Optimal policy', optdecpolicy.reshape(modecount, poscount).T)
 
 returneval = counter.simulate(50, raam.vec2policy(optdecpolicy, actions, decstatenum),120)
@@ -71,7 +71,7 @@ print('Optimal return', returneval.statistics(counter.discount)['mean_return'])
 
 # get samples
 counter.set_acceptable_modes(1)
-samples = counter.simulate(1000, counter.random_policy(),20)
+samples = counter.simulate(1000, counter.random_policy(),200)
 counter.set_acceptable_modes(modecount)
 
 # build the sampled MDP    
@@ -92,16 +92,15 @@ for i in range(1, modecount):
 
 basedecpolicy = basedecpolicy.reshape(-1)
 
-print('Baseline value function', basedecvalue.reshape(modecount, poscount).T)
+print('Baseline value function\n', basedecvalue.reshape(modecount, poscount).T)
 print('Policy', basedecpolicy.reshape(modecount, poscount).T)
 
 returneval = counter.simulate(50, raam.vec2policy(basedecpolicy, actions, decstatenum),120)
 print('Baseline optimal return', returneval.statistics(counter.discount)['mean_return'])
 
-# TODO: write a test that takes samples and then computes the outcomes across the states to make sure that they are equal
+# TODO: write a test that takes samples and then sums the number of outcomes across states to make sure that they are equal
 
 ## Compute a regular solution 
-
 
 np.random.seed(0)
 samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
@@ -178,7 +177,6 @@ def err(samples):
     """
     return 0.4 / np.sqrt(samples)
 
-
 np.random.seed(0)
 samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
 
@@ -221,4 +219,54 @@ print('Return of expectation policy', returneval.statistics(counter.discount)['m
 
 ## Compute the jointly optimized solution
 
+def err(samples):
+    """
+    Computes the L1 deviation in the transition probabilities for the given
+    number of samples
+    """
+    return 0.4 / np.sqrt(samples)
 
+np.random.seed(0)
+samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+
+r = crobust.SRoMDP(1,counter.discount)
+r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
+                expagg_big=expstatenum, expagg_small=sampleindex,
+                actagg=features.IdCache())
+
+# compute the number of samples for each expectation state
+expstateinds = r.expstate_numbers()
+decstateinds = r.decstate_numbers()
+samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
+
+r.rmdp.set_uniform_distributions(1.0)
+
+# *******
+# add transitions to all decision states (even if not sampled)
+#   IMPORTANT: needs to come after getting sample counts
+for es,scount in zip(expstateinds, samplecounts):
+    dist = [1.0] * scount
+    for ds in decstateinds:
+        r.rmdp.add_transition(es,0,r.rmdp.outcome_count(es,0),ds,0.0,0.0)
+        dist.append(0)
+    dist = np.array(dist)
+    dist = dist / dist.sum()
+    r.rmdp.set_distribution(es,0,dist,err(scount))
+    
+
+# solve sampled MDP
+v,pol,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
+
+robdecvalue = r.decvalue(decstatecount, v)
+robdecpolicy = r.decpolicy(decstatecount, pol)
+# use a default action when there were no samples for it
+robdecpolicy[np.where(robdecpolicy < 0)] = 1
+
+# compute the number of samples for each expectation state
+returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),200)
+print('Expected value of the expectation policy', robdecvalue[0])
+print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
+
+
+# now compute the baseline optimistic policy
+baseline_mdp = r.rmdp.copy()
