@@ -147,12 +147,12 @@ cdef class RoMDP:
         ----------
         fromid : long
             Unique identifier of the source state of the transition 
+        actionid : long
+            Identifier of the action. It is unique for the given state
         outcomeid : long
             Identifier of the outcome. It is unique for the given state
         toid : long
             Unique identifier of the target state of the transition
-        actionid : long
-            Identifier of the action. It is unique for the given state
         probability : float
             Probability of the distribution
         reward : float

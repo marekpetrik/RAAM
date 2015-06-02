@@ -131,7 +131,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.2 / np.sqrt(samples)
+    return 0.1 / np.sqrt(samples)
 
 maxr = np.max(rewards)
 
@@ -162,16 +162,62 @@ v,pol,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
 expadjdecvalue = r.decvalue(decstatecount, v)
 expadjdecpolicy = r.decpolicy(decstatecount, pol)
 # use a default action when there were no samples for it
-expadjdecpolicy[np.where(expdecpolicy < 0)] = 1
+expadjdecpolicy[np.where(expadjdecpolicy < 0)] = 1
 
 # compute the number of samples for each expectation state
 returneval = counter.simulate(50, raam.vec2policy(expadjdecpolicy, actions, decstatenum),120)
 print('Expected value of the expectation policy', expadjdecvalue[0])
 print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
 
-## Compute a robust optimal solution
+## Compute a robust solution
+
+def err(samples):
+    """
+    Computes the L1 deviation in the transition probabilities for the given
+    number of samples
+    """
+    return 0.4 / np.sqrt(samples)
 
 
+np.random.seed(0)
+samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+
+r = crobust.SRoMDP(1,counter.discount)
+r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
+                expagg_big=expstatenum, expagg_small=sampleindex,
+                actagg=features.IdCache())
+
+# compute the number of samples for each expectation state
+expstateinds = r.expstate_numbers()
+decstateinds = r.decstate_numbers()
+samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
+
+r.rmdp.set_uniform_distributions(1.0)
+
+# *******
+# add transitions to all decision states (even if not sampled)
+#   IMPORTANT: needs to come after getting sample counts
+for es,scount in zip(expstateinds, samplecounts):
+    dist = [1.0] * scount
+    for ds in decstateinds:
+        r.rmdp.add_transition(es,0,r.rmdp.outcome_count(es,0),ds,0.0,0.0)
+        dist.append(0)
+    dist = np.array(dist)
+    dist = dist / dist.sum()
+    r.rmdp.set_distribution(es,0,dist,err(scount))
+    
+# solve sampled MDP
+v,pol,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
+
+robdecvalue = r.decvalue(decstatecount, v)
+robdecpolicy = r.decpolicy(decstatecount, pol)
+# use a default action when there were no samples for it
+robdecpolicy[np.where(robdecpolicy < 0)] = 1
+
+# compute the number of samples for each expectation state
+returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),200)
+print('Expected value of the expectation policy', robdecvalue[0])
+print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
 
 ## Compute the jointly optimized solution
 
