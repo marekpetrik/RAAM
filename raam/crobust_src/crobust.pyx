@@ -47,14 +47,16 @@ cdef extern from "../../craam/include/RMDP.hpp":
         void set_uniform_distribution(double threshold);
         void set_uniform_thresholds(double threshold) except +
 
-        double get_reward(long stateid, long actionid, long outcomeid, 
-                            long sampleid) except +
+        double get_reward(long stateid, long actionid, long outcomeid, long sampleid) except +
         void set_reward(long stateid, long actionid, long outcomeid, long sampleid, 
                             double reward) except +
         long sample_count(long stateid, long actionid, long outcomeid) except +
 
         double get_threshold(long stateid, long actionid) except +
         void set_threshold(long stateid, long actionid, double threshold) except +
+
+        double get_toid(long stateid, long actionid, long outcomeid, long sampleid) except +
+        double get_probability(long stateid, long actionid, long outcomeid, long sampleid) except +
 
         void normalize()
 
@@ -712,10 +714,16 @@ cdef class RoMDP:
         return self.thisptr.outcome_count(stateid, actionid)
 
     cpdef double get_reward(self, long stateid, long actionid, long outcomeid, long sampleid):
-        """
-        Returns the reward for the given state, action, and outcome
-        """
+        """ Returns the reward for the given state, action, and outcome """
         return self.thisptr.get_reward(stateid, actionid, outcomeid, sampleid)
+        
+    cpdef double get_toid(self, long stateid, long actionid, long outcomeid, long sampleid):
+        """ Returns the target state for the given state, action, and outcome """
+        return self.thisptr.get_toid(stateid, actionid, outcomeid, sampleid)
+        
+    cpdef double get_probability(self, long stateid, long actionid, long outcomeid, long sampleid):
+        """ Returns the probability for the given state, action, and outcome """
+        return self.thisptr.get_probability(stateid, actionid, outcomeid, sampleid)
     
     cpdef set_reward(self, long stateid, long actionid, long outcomeid, long sampleid, double reward):
         """

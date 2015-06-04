@@ -223,7 +223,7 @@ returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstat
 print('Expected value of the expectation policy', robdecvalue[0])
 print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
 
-## Compute the jointly optimized solution
+## Compute the jointly optimized solution (simple baseline approach)
 
 def err(samples):
     """
@@ -258,10 +258,18 @@ for es,scount in zip(expstateinds, samplecounts):
     dist = np.array(dist)
     dist = dist / dist.sum()
     r.rmdp.set_distribution(es,0,dist,err(scount))
-    
+
+
+# set policies according to the baseline transitions
+# TODO: this is a quite bit of a hack and may not lead to the optimal solution    
+rmdp = r.rmdp.copy()
+# make all transitions that do not represent the baseline policy appear bad
+for ds,ind in zip(decstatenums, decstateinds):
+    a = basedecpolicy[ds] 
+    rmdp.set_threshold(ind,a,0,0,-1000)
 
 # solve sampled MDP
-v,pol,_,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
+v,pol,_,_,_ = rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
 
 robdecvalue = r.decvalue(decstatecount, v)
 robdecpolicy = r.decpolicy(decstatecount, pol)
@@ -272,6 +280,7 @@ robdecpolicy[np.where(robdecpolicy < 0)] = 1
 returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),200)
 print('Expected value of the expectation policy', robdecvalue[0])
 print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
+
 
 # ********
 ## now compute the baseline optimistic policy
