@@ -5,6 +5,9 @@ from raam import features
 from raam import examples
 import numpy as np
 from counter_modes import CounterModes
+import random
+
+import srobust
 
 # define counter
 rewards = np.array([-1,1,2,3,2,1,-1,-2,-3,3,4,5])
@@ -18,10 +21,9 @@ decstatecount = poscount * modecount
 
 # define test parameters
 test_steps = 50
-test_counts = 20
+test_counts = 40
 
-## Define state numbering
-
+# Define state numbering
 # define state aggregation functions
 def decstatenum(x): 
     pos,mode = x
@@ -44,89 +46,76 @@ def sampleindex(x):
 def actionagg(act):
     return actions.index(act)
 
-## Compute optimal policy
+## Optimal policy
 
 # get samples
-np.random.seed(0)
+np.random.seed(20)
+random.seed(20)
 samples = counter.simulate(1000, counter.random_policy(),20)
 
-# build the sampled MDP    
-r = crobust.SRoMDP(1,counter.discount)
-r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
-                expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=actionagg)
-#r.rmdp.set_uniform_distributions(0.0)
+optdecvalue, optdecpolicy = srobust.solve_expectation(samples, counter.discount, decstatecount, \
+                            decagg_big=decstatenum, decagg_small=zero, 
+                            expagg_big=expstatenum, expagg_small=sampleindex, 
+                            actagg=actionagg)
 
-
-# solve sampled MDP
-v,pol,_,_,_ = r.rmdp.mpi_jac(5000,stype=robust.SolutionType.Average.value)
-
-optdecvalue = r.decvalue(decstatecount, v)
-optdecpolicy = r.decpolicy(decstatecount, pol)
+optrv = counter.simulate(50, raam.vec2policy(optdecpolicy, actions, decstatenum), \
+                                200).statistics(counter.discount)['mean_return']
 
 print('Optimal value function\n', optdecvalue.reshape(modecount, poscount).T)
 print('Optimal policy', optdecpolicy.reshape(modecount, poscount).T)
+print('Optimal return', optrv)
 
-returneval = counter.simulate(50, raam.vec2policy(optdecpolicy, actions, decstatenum),120)
-print('Optimal return', returneval.statistics(counter.discount)['mean_return'])
-
-## Compute the baseline policy
+## Baseline policy
 
 # get samples
 counter.set_acceptable_modes(1)
-samples = counter.simulate(1000, counter.random_policy(),20)
+np.random.seed(30)
+random.seed(30)
+samples = counter.simulate(1000, counter.random_policy(),10)
 counter.set_acceptable_modes(modecount)
 
-# build the sampled MDP    
-r = crobust.SRoMDP(1,counter.discount)
-r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
-                expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=actionagg)
-#r.rmdp.set_uniform_distributions(0.0)
+basedecvalue, basedecpolicy = srobust.solve_expectation(samples, counter.discount, decstatecount, \
+                            decagg_big=decstatenum, decagg_small=zero, 
+                            expagg_big=expstatenum, expagg_small=sampleindex, 
+                            actagg=actionagg)
 
-# solve sampled MDP
-v,pol,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
-
-basedecvalue = r.decvalue(decstatecount, v)
-basedecpolicy = r.decpolicy(decstatecount, pol).reshape(modecount, poscount)
-
+# extend the baseline policy back to all states
+basedecpolicy = basedecpolicy.reshape(modecount, -1)
 for i in range(1, modecount):
     basedecpolicy[i,:] = basedecpolicy[0,:] 
-
 basedecpolicy = basedecpolicy.reshape(-1)
-basedecpolicy[np.where(basedecpolicy > 1)] = 0
+# remove the transitions between modes
+basedecpolicy[np.where(basedecpolicy > 1)] = 1
 
-print('Baseline value function\n', basedecvalue.reshape(modecount, poscount).T)
-print('Policy', basedecpolicy.reshape(modecount, poscount).T)
-
+# construct baseline policy
 baselinepol_fun = raam.vec2policy(basedecpolicy, actions, decstatenum)
-returneval = counter.simulate(50, baselinepol_fun, 120)
-print('Baseline optimal return', returneval.statistics(counter.discount)['mean_return'])
+
+baserv = counter.simulate(50, baselinepol_fun, 200).statistics(counter.discount)['mean_return']
+
+print('Baseline value function\n', basedecvalue.reshape(modecount, -1).T)
+print('Policy', basedecpolicy.reshape(modecount, -1).T)
+print('Baseline optimal return', baserv)
 
 # TODO: write a test that takes samples and then sums the number of outcomes across states to make sure that they are equal
 
-## Compute a regular solution 
+## Evaluate the regular solution 
 
 np.random.seed(0)
-samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+random.seed(0)
 
-r = crobust.SRoMDP(1,counter.discount)
-r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
-                expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=actionagg)
-
-# solve sampled MDP
-v,pol,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
-
-expdecvalue = r.decvalue(decstatecount, v)
-expdecpolicy = r.decpolicy(decstatecount, pol)
-# use a default action when there were no samples for it
-expdecpolicy[np.where(expdecpolicy < 0)] = 1
-
-# compute the number of samples for each expectation state
-returneval = counter.simulate(50, raam.vec2policy(expdecpolicy, actions, decstatenum),120)
-print('Expected value of the expectation policy', expdecvalue[0])
-print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
+for count in range(1,test_counts):
+    samples = counter.simulate(test_steps, counter.random_policy(),count)
+    
+    expdecvalue, expdecpolicy = srobust.solve_expectation(samples, counter.discount, decstatecount, \
+                                decagg_big=decstatenum, decagg_small=zero, 
+                                expagg_big=expstatenum, expagg_small=sampleindex, 
+                                actagg=actionagg)
+    expdecpolicy[np.where(expdecpolicy < 0)] = 1
+    
+    # compute the number of samples for each expectation state
+    exprv = counter.simulate(50, raam.vec2policy(expdecpolicy, actions, decstatenum),200).statistics(counter.discount)['mean_return']
+    print('Expected value of the expectation policy', expdecvalue[0])
+    print('Return of expectation policy', exprv)
 
 ## Compute a reward adjusted solution
 
