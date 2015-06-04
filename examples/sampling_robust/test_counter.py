@@ -9,7 +9,7 @@ from counter_modes import CounterModes
 # define counter
 rewards = np.array([-1,1,2,3,2,1,-1,-2,-3,3,4,5])
 modecount = 3
-success = 0.5
+success = [0.1,0.8,0.3]
 poscount = len(rewards)
 np.random.seed(0)
 counter = CounterModes(rewards,modecount,success)
@@ -17,7 +17,7 @@ actions = counter.actions(counter.initstates().__next__())
 decstatecount = poscount * modecount
 
 # define test parameters
-test_steps = 20
+test_steps = 50
 test_counts = 20
 
 ## Define state numbering
@@ -41,17 +41,20 @@ def sampleindex(x):
     dict_si[x] = index + 1
     return index
 
+def actionagg(act):
+    return actions.index(act)
+
 ## Compute optimal policy
 
 # get samples
 np.random.seed(0)
-samples = counter.simulate(1000, counter.random_policy(),200)
+samples = counter.simulate(1000, counter.random_policy(),20)
 
 # build the sampled MDP    
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=features.IdCache())
+                actagg=actionagg)
 #r.rmdp.set_uniform_distributions(0.0)
 
 
@@ -71,14 +74,14 @@ print('Optimal return', returneval.statistics(counter.discount)['mean_return'])
 
 # get samples
 counter.set_acceptable_modes(1)
-samples = counter.simulate(1000, counter.random_policy(),200)
+samples = counter.simulate(1000, counter.random_policy(),20)
 counter.set_acceptable_modes(modecount)
 
 # build the sampled MDP    
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=features.IdCache())
+                actagg=actionagg)
 #r.rmdp.set_uniform_distributions(0.0)
 
 # solve sampled MDP
@@ -108,7 +111,7 @@ samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=features.IdCache())
+                actagg=actionagg)
 
 # solve sampled MDP
 v,pol,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
@@ -140,7 +143,7 @@ samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=features.IdCache())
+                actagg=actionagg)
 
 # compute the number of samples for each expectation state
 expstateinds = r.expstate_numbers()
@@ -175,7 +178,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.4 / np.sqrt(samples)
+    return 0.35 / np.sqrt(samples)
 
 np.random.seed(0)
 samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
@@ -183,7 +186,7 @@ samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=features.IdCache())
+                actagg=actionagg)
 
 # compute the number of samples for each expectation state
 expstateinds = r.expstate_numbers()
@@ -198,6 +201,7 @@ r.rmdp.set_uniform_distributions(1.0)
 for es,scount in zip(expstateinds, samplecounts):
     dist = [1.0] * scount
     for ds in decstateinds:
+        # TODO: the zero reward here is not exactly right
         r.rmdp.add_transition(es,0,r.rmdp.outcome_count(es,0),ds,0.0,0.0)
         dist.append(0)
     dist = np.array(dist)
@@ -224,7 +228,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.4 / np.sqrt(samples)
+    return 0.35 / np.sqrt(samples)
 
 np.random.seed(0)
 samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
@@ -232,7 +236,7 @@ samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=features.IdCache())
+                actagg=actionagg)
 
 # compute the number of samples for each expectation state
 expstateinds = r.expstate_numbers()
@@ -270,3 +274,8 @@ print('Return of expectation policy', returneval.statistics(counter.discount)['m
 
 # now compute the baseline optimistic policy
 baseline_mdp = r.rmdp.copy()
+
+
+
+v,pol,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
+

@@ -37,16 +37,21 @@ class CounterModes(raam.simulator.Simulator):
     modecount : int
         Number of modes. The reward in all modes are the same. The transition 
         probabilities may differ.
-    succ_prob : float
+    succ_prob : vector
         Probabilities that the left-right actions succeed, otherwise the move is 
         with probabilities given by an initally constructed random distribution.
+        One success probability for every mode
         
     """
+    
     def __init__(self,rewards,modecount,succ_prob):
+        assert len(succ_prob) == modecount
+        
         self.__statecount = len(rewards)
         self.__rewards = rewards
         self.__modecount = modecount
         self.__succ_prob = succ_prob
+        self.__actions = ['plus','minus','modeup','modedown']
 
         # the probability that the mode changes when no mode change action is taken
         self.__mode_change_prob = 0.7
@@ -88,19 +93,20 @@ class CounterModes(raam.simulator.Simulator):
         # nmode - new mode
         
         # update the new position
-        if random.random() <= self.__succ_prob:
+        if random.random() <= self.__succ_prob[mode]:
             # make the change according to the success probability
             if action == 'plus':
                 npos = pos + 1
             elif action == 'minus':
                 npos = pos - 1
             else:
-                npos = pos            
+                # choose position randomly
+                p = self.__P[mode][pos,:]
+                npos = np.random.choice(np.arange(self.__statecount), p=p)
             
             npos = min(max(0, npos),self.__statecount-1)
         else:
             # make the transition randomly according to the change probability
-            
             p = self.__P[mode][pos,:]
             npos = np.random.choice(np.arange(self.__statecount), p=p)
             
@@ -129,5 +135,5 @@ class CounterModes(raam.simulator.Simulator):
         return itertools.cycle( ((0,0),) )
         
     def actions(self,decstate):
-        return ['plus','minus','modeup','modedown']
+        return self.__actions
 
