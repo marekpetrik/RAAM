@@ -634,7 +634,7 @@ class TestPrecise(unittest.TestCase):
         result = robust.matrices(self.samplesstoch,decagg=decagg,expagg=expagg)
         rmdp = crobust.RoMDP(7,0.9)
         rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_ = rmdp.vi_gs(200)
+        valuefunction,_,_,_,_ = rmdp.vi_gs(200)
     
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
@@ -646,7 +646,7 @@ class TestPrecise(unittest.TestCase):
         result = robust.matrices(self.samplesstoch,decagg=decagg,expagg=expagg)
         rmdp = crobust.RoMDP(7,0.9)
         rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_ = rmdp.vi_jac(200)
+        valuefunction,_,_,_,_ = rmdp.vi_jac(200)
     
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
@@ -678,7 +678,7 @@ class TestPrecise(unittest.TestCase):
         result = robust.matrices(self.samples,decagg=decagg,expagg=expagg)
         rmdp = crobust.RoMDP(7,0.9)
         rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_ = rmdp.vi_gs(200)
+        valuefunction,_,_,_,_ = rmdp.vi_gs(200)
     
         des = [ 30., 30., 29., 27.1, 29., 30., 30.]
         for a,b in zip(des, valuefunction):
@@ -690,7 +690,7 @@ class TestPrecise(unittest.TestCase):
         result = robust.matrices(self.samples,decagg=decagg,expagg=expagg)
         rmdp = crobust.RoMDP(7,0.9)
         rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_ = rmdp.vi_jac(200)
+        valuefunction,_,_,_,_ = rmdp.vi_jac(200)
     
         des = [ 30., 30., 29., 27.1, 29., 30., 30.]
         for a,b in zip(des, valuefunction):
@@ -909,7 +909,7 @@ class RobustTests(unittest.TestCase):
         
         rmdp = crobust.RoMDP(states,0.99)
         rmdp.from_matrices(transitions,rewards,actions,outcomes)
-        value,policy,residual,iterations = rmdp.mpi_jac(1000)
+        value,policy,residual,iterations,_ = rmdp.mpi_jac(1000)
          
         target_value = [ 67.48585933,  67.6855307 ,  67.15995444,  67.33964064,
             67.35730334,  67.448749  ,  67.38176967,  67.65606086,
@@ -1243,7 +1243,7 @@ class RobustRecommenderOptimistic(unittest.TestCase):
         
     def test_python_implementation(self):
         result = self.result
-        values, policy_vec, residual = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],1,100,type='optimistic')
+        values, policy_vec, residual, _ = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],1,100,type='optimistic')
         self._check_vrobust(values)
     
     def test_l1_half(self):

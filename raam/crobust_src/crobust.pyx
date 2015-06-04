@@ -25,6 +25,7 @@ cdef extern from "../../craam/include/RMDP.hpp":
         vector[double] valuefunction
         vector[long] policy
         vector[long] outcomes
+        vector[vector[double]] outcome_dists
         double residual
         long iterations
 
@@ -251,9 +252,15 @@ cdef class RoMDP:
         Returns
         -------
         valuefunction : np.ndarray
+            Optimized value function
         policy : np.ndarray
+            Policy greedy for value function
         residual : double
+            Residual for the value function
         iterations : int
+            Number of iterations taken
+        outcomes : np.ndarray
+            Outcomes selected
         
         See Also
         --------
@@ -275,7 +282,8 @@ cdef class RoMDP:
             st = Average
  
         cdef Solution sol = self.thisptr.vi_gs(valuefunction,self.discount,iterations,maxresidual,st)
-        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
+        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
+                sol.iterations, sol.outcomes
         
 
     cpdef vi_gs_l1(self, int iterations, valuefunction = np.empty(0), \
@@ -305,9 +313,15 @@ cdef class RoMDP:
         Returns
         -------
         valuefunction : np.ndarray
+            Optimized value function
         policy : np.ndarray
+            Policy greedy for value function
         residual : double
+            Residual for the value function
         iterations : int
+            Number of iterations taken
+        outcome_dists : np.ndarray[np.ndarray]
+            Distributions of outcomes
         """
         
         if valuefunction.shape[0] == 0:
@@ -326,7 +340,8 @@ cdef class RoMDP:
  
         cdef Solution sol = self.thisptr.vi_gs_l1(valuefunction,self.discount,iterations,maxresidual,st)
         
-        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
+        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
+                sol.iterations, sol.outcome_dists
         
     cpdef vi_jac(self, int iterations,valuefunction = np.empty(0), \
                                     double maxresidual=0, int stype=0):
@@ -353,9 +368,15 @@ cdef class RoMDP:
         Returns
         -------
         valuefunction : np.ndarray
+            Optimized value function
         policy : np.ndarray
+            Policy greedy for value function
         residual : double
+            Residual for the value function
         iterations : int
+            Number of iterations taken
+        outcomes : np.ndarray
+            Outcomes selected
         """
         
         if valuefunction.shape[0] == 0:
@@ -373,7 +394,8 @@ cdef class RoMDP:
             st = Average
 
         cdef Solution sol = self.thisptr.vi_jac(valuefunction,self.discount,iterations,maxresidual,st)
-        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
+        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
+                sol.iterations, sol.outcomes
 
     cpdef vi_jac_l1(self, long iterations, valuefunction = np.empty(0), \
                                     double maxresidual = 0, int stype=0):
@@ -400,9 +422,15 @@ cdef class RoMDP:
         Returns
         -------
         valuefunction : np.ndarray
+            Optimized value function
         policy : np.ndarray
+            Policy greedy for value function
         residual : double
+            Residual for the value function
         iterations : int
+            Number of iterations taken
+        outcome_dists : np.ndarray[np.ndarray]
+            Distributions of outcomes
         """
         
         if valuefunction.shape[0] == 0:
@@ -420,7 +448,8 @@ cdef class RoMDP:
             st = Average
 
         cdef Solution sol = self.thisptr.vi_jac_l1(valuefunction,self.discount,iterations,maxresidual,st)
-        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
+        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
+                sol.iterations, sol.outcome_dists
 
     cpdef mpi_jac(self, long iterations, valuefunction = np.empty(0), \
                                     double maxresidual = 0, long valiterations = 1000, int stype=0):
@@ -449,9 +478,15 @@ cdef class RoMDP:
         Returns
         -------
         valuefunction : np.ndarray
+            Optimized value function
         policy : np.ndarray
+            Policy greedy for value function
         residual : double
+            Residual for the value function
         iterations : int
+            Number of iterations taken
+        outcomes : np.ndarray
+            Outcomes selected
         """
         
         if valuefunction.shape[0] == 0:
@@ -473,7 +508,8 @@ cdef class RoMDP:
 
         cdef Solution sol = self.thisptr.mpi_jac(valuefunction,self.discount,iterations,maxresidual,\
                                                         valiterations, valresidual,st)
-        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
+        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
+                sol.iterations, sol.outcomes
 
 
     cpdef mpi_jac_l1(self, long iterations, valuefunction = np.empty(0), \
@@ -503,9 +539,15 @@ cdef class RoMDP:
         Returns
         -------
         valuefunction : np.ndarray
+            Optimized value function
         policy : np.ndarray
+            Policy greedy for value function
         residual : double
+            Residual for the value function
         iterations : int
+            Number of iterations taken
+        outcome_dists : np.ndarray[np.ndarray]
+            Distributions of outcomes
         """
         
         if valuefunction.shape[0] == 0:
@@ -527,8 +569,10 @@ cdef class RoMDP:
 
         cdef Solution sol = self.thisptr.mpi_jac_l1(valuefunction,self.discount,iterations,maxresidual,\
                                                     valiterations, valresidual, st)
-        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, sol.iterations
+                                                    
 
+        return np.array(sol.valuefunction), np.array(sol.policy), sol.residual,\
+                sol.iterations, sol.outcome_dists
 
     cpdef from_sample_matrices(self, dectoexp, exptodec, actions, rewards):
         """
