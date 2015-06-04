@@ -675,7 +675,7 @@ cdef class RoMDP:
     
     cpdef set_reward(self, long stateid, long actionid, long outcomeid, long sampleid, double reward):
         """
-        Sets the reward for the given state, action, and outcome
+        Sets the reward for the given state, action, outcome, and sample
         """
         self.thisptr.set_reward(stateid, actionid, outcomeid, sampleid, reward)
         
@@ -1073,15 +1073,28 @@ class SRoMDP:
     def expstate_numbers(self):
         """
         Returns numbers of the internal RoMDP states that correspond to the
-        expectation states.
+        expectation states as well as the expectation state numbers.
+        
+        Returns
+        -------
+        expstate_original : list
+            Original numbers assigned to the expectation states
+        expstate_index : list        
+            Index of the expectation state in the constructed RMDP
         """
-        return list(self.statemaps.expstate2state.values())
+        return list( zip(*self.statemaps.expstate2state.items()) )
         
     def decstate_numbers(self):
         """
         Returns numbers of the internal RoMDP states that correspond to the
-        decision states.
+        decision states as well as the decision state numbers.
+
+        Returns
+        -------
+        decstate_original : list
+            Original numbers assigned to the decision states
+        decstate_index : list        
+            Index of the decision state in the constructed RMDP
         """
-        return list(self.statemaps.decstate2state.values())
         
-                
+        return list( zip(*self.statemaps.decstate2state.items()) )

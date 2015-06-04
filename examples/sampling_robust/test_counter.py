@@ -94,11 +94,13 @@ for i in range(1, modecount):
     basedecpolicy[i,:] = basedecpolicy[0,:] 
 
 basedecpolicy = basedecpolicy.reshape(-1)
+basedecpolicy[np.where(basedecpolicy > 1)] = 0
 
 print('Baseline value function\n', basedecvalue.reshape(modecount, poscount).T)
 print('Policy', basedecpolicy.reshape(modecount, poscount).T)
 
-returneval = counter.simulate(50, raam.vec2policy(basedecpolicy, actions, decstatenum),120)
+baselinepol_fun = raam.vec2policy(basedecpolicy, actions, decstatenum)
+returneval = counter.simulate(50, baselinepol_fun, 120)
 print('Baseline optimal return', returneval.statistics(counter.discount)['mean_return'])
 
 # TODO: write a test that takes samples and then sums the number of outcomes across states to make sure that they are equal
@@ -146,7 +148,7 @@ r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 actagg=actionagg)
 
 # compute the number of samples for each expectation state
-expstateinds = r.expstate_numbers()
+_, expstateinds = r.expstate_numbers()
 samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
 
 # adjust the rewards *******
@@ -178,7 +180,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.35 / np.sqrt(samples)
+    return 0.3 / np.sqrt(samples)
 
 np.random.seed(0)
 samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
@@ -189,8 +191,8 @@ r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 actagg=actionagg)
 
 # compute the number of samples for each expectation state
-expstateinds = r.expstate_numbers()
-decstateinds = r.decstate_numbers()
+_,expstateinds = r.expstate_numbers()
+_,decstateinds = r.decstate_numbers()
 samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
 
 r.rmdp.set_uniform_distributions(1.0)
@@ -228,10 +230,10 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.35 / np.sqrt(samples)
+    return 0.3 / np.sqrt(samples)
 
 np.random.seed(0)
-samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+samples = counter.simulate(test_steps, counter.random_policy(),20*test_counts)
 
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
@@ -239,8 +241,8 @@ r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 actagg=actionagg)
 
 # compute the number of samples for each expectation state
-expstateinds = r.expstate_numbers()
-decstateinds = r.decstate_numbers()
+_,expstateinds = r.expstate_numbers()
+decstatenums,decstateinds = r.decstate_numbers()
 samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
 
 r.rmdp.set_uniform_distributions(1.0)
@@ -271,11 +273,19 @@ returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstat
 print('Expected value of the expectation policy', robdecvalue[0])
 print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
 
+# ********
+## now compute the baseline optimistic policy
+baseline_rmdp = r.rmdp.copy()
 
-# now compute the baseline optimistic policy
-baseline_mdp = r.rmdp.copy()
+# make all transitions that do not represent the baseline policy appear bad
+for ds,ind in zip(decstatenums, decstateinds):
+    for a in range(baseline_mdp.action_count(ind)):
+        # add a bad reward if the action is not a baseline action
+        if basedecpolicy[ds] != a:
+            baseline_rmdp.set_reward(ind,a,0,0,-1000)
 
+v,pol,_,_ = baseline_rmdp.mpi_jac(100,stype=robust.SolutionType.Average.value)
 
+optdecvalue = r.decvalue(decstatecount, v)
 
-v,pol,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
-
+print(optdecvalue)
