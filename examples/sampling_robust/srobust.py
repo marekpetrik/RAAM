@@ -117,3 +117,7 @@ def solve_robust(samples, discount, decstatecount, decagg_big, decagg_small,
     else:
         return baselinepol, baselinepol
     
+    
+def sol_robust_joint(samples, discount, decstatecount, decagg_big, decagg_small, 
+                        expagg_big, expagg_small, actagg, maxr, err, baselinepol, 
+                        baselineval, baselinerv):

@@ -111,9 +111,9 @@ print('Baseline optimal return', baserv)
 np.random.seed(0)
 random.seed(0)
 
-expectation_results = np.empty((test_counts-1, experiment_runs))
+expectation_results = np.empty((test_counts, experiment_runs))
 
-for count in test_count_vals:
+for i,count in enumerate(test_count_vals):
     for erun in range(experiment_runs):
         samples = counter.simulate(test_steps, counter.random_policy(),count)
         
@@ -131,9 +131,9 @@ for count in test_count_vals:
         #print('Expected value of the expectation policy', expdecvalue[0])
         #print('Return of expectation policy', exprv)
         
-        expectation_results[count-1, erun] = exprv
+        expectation_results[i, erun] = exprv
 
-xvals = np.arange(1,test_counts)*test_steps
+xvals = test_count_vals*test_steps
 pp.plot(xvals, expectation_results.mean(1),label='Expectation')
 pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
 pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
@@ -151,16 +151,16 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.1 / np.sqrt(samples)
+    return 0.25 / np.sqrt(samples)
 
 maxr = np.max(rewards)
 
 np.random.seed(0)
 random.seed(0)
 
-rewadj_results = np.empty((test_counts-1, experiment_runs))
+rewadj_results = np.empty((test_counts, experiment_runs))
 
-for count in test_count_vals:
+for i,count in enumerate(test_count_vals):
     for erun in range(experiment_runs):
 
         samples = counter.simulate(test_steps, counter.random_policy(),count)
@@ -178,9 +178,9 @@ for count in test_count_vals:
         #print('Expected value of the expectation policy', expadjdecvalue[0])
         #print('Return of expectation policy', rewadjrv)
 
-        rewadj_results[count-1, erun] = rewadjrv
+        rewadj_results[i, erun] = rewadjrv
 
-xvals = np.arange(1,test_counts)*test_steps
+xvals = test_count_vals*test_steps
 pp.plot(xvals, expectation_results.mean(1),label='Expectation')
 pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
 
@@ -196,19 +196,21 @@ pp.show()
 
 imp.reload(srobust)
 
+experiment_runs = 3
+
 def err(samples):
     """
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.3 / np.sqrt(samples)
+    return 0.25 / np.sqrt(samples)
 
-robust_results = np.empty((test_counts-1, experiment_runs))
+robust_results = np.empty((test_counts, experiment_runs))
 
 np.random.seed(0)
 random.seed(0)
 
-for count in test_count_vals:
+for i,count in enumerate(test_count_vals):
     for erun in range(experiment_runs):
 
         samples = counter.simulate(test_steps, counter.random_policy(),count)
@@ -226,7 +228,7 @@ for count in test_count_vals:
                 
         #print('Expected value of the robust policy', robdecvalue[0])
         #print('Return of robust policy', robrv)
-        robust_results[count-1, erun] = robrv
+        robust_results[i, erun] = robrv
 
 xvals = test_count_vals*test_steps
 pp.plot(xvals, expectation_results.mean(1),label='Expectation')
@@ -240,7 +242,7 @@ pp.ylabel('Return')
 pp.grid()
 pp.show()
 
-## Compute the jointly optimized solution (simple baseline approach)
+## Combined robust and baseline
 
 def err(samples):
     """
@@ -323,7 +325,7 @@ optdecvalue = r.decvalue(decstatecount, v)
 
 print(optdecvalue)
 
-## iterate the value function
+## Iterative solution method for the value function
 
 # compute baseline action outcome probabilities
 
