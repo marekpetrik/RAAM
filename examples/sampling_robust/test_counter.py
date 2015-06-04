@@ -233,7 +233,7 @@ def err(samples):
     return 0.3 / np.sqrt(samples)
 
 np.random.seed(0)
-samples = counter.simulate(test_steps, counter.random_policy(),20*test_counts)
+samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
 
 r = crobust.SRoMDP(1,counter.discount)
 r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
@@ -263,10 +263,13 @@ for es,scount in zip(expstateinds, samplecounts):
 # set policies according to the baseline transitions
 # TODO: this is a quite bit of a hack and may not lead to the optimal solution    
 rmdp = r.rmdp.copy()
-# make all transitions that do not represent the baseline policy appear bad
 for ds,ind in zip(decstatenums, decstateinds):
     a = basedecpolicy[ds] 
-    rmdp.set_threshold(ind,a,0,0,-1000)
+    # get the expectation state that corresponds to the baseline policy
+    # assumes that all transitions are to the same state
+    expind = rmdp.get_toid(ind,a,0,0)
+    # set the threshold to be small for this transition
+    rmdp.set_threshold(expind,0,0.0)
 
 # solve sampled MDP
 v,pol,_,_,_ = rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
@@ -274,21 +277,25 @@ v,pol,_,_,_ = rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
 robdecvalue = r.decvalue(decstatecount, v)
 robdecpolicy = r.decpolicy(decstatecount, pol)
 # use a default action when there were no samples for it
-robdecpolicy[np.where(robdecpolicy < 0)] = 1
+robdecpolicy[np.where(robdecpolicy < 0)] = 0
 
 # compute the number of samples for each expectation state
 returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),200)
+
+print(robdecvalue)
+
 print('Expected value of the expectation policy', robdecvalue[0])
 print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
 
 
 # ********
 ## now compute the baseline optimistic policy
+
 baseline_rmdp = r.rmdp.copy()
 
 # make all transitions that do not represent the baseline policy appear bad
 for ds,ind in zip(decstatenums, decstateinds):
-    for a in range(baseline_mdp.action_count(ind)):
+    for a in range(baseline_rmdp.action_count(ind)):
         # add a bad reward if the action is not a baseline action
         if basedecpolicy[ds] != a:
             baseline_rmdp.set_reward(ind,a,0,0,-1000)
