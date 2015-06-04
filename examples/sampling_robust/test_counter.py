@@ -6,8 +6,10 @@ from raam import examples
 import numpy as np
 from counter_modes import CounterModes
 import random
-
+import matplotlib.pyplot as pp
 import srobust
+import imp
+imp.reload(srobust)
 
 # define counter
 rewards = np.array([-1,1,2,3,2,1,-1,-2,-3,3,4,5])
@@ -22,6 +24,7 @@ decstatecount = poscount * modecount
 # define test parameters
 test_steps = 50
 test_counts = 40
+experiment_runs = 5
 
 # Define state numbering
 # define state aggregation functions
@@ -46,7 +49,7 @@ def sampleindex(x):
 def actionagg(act):
     return actions.index(act)
 
-## Optimal policy
+## Optimal and baseline policy
 
 # get samples
 np.random.seed(20)
@@ -57,21 +60,22 @@ optdecvalue, optdecpolicy = srobust.solve_expectation(samples, counter.discount,
                             decagg_big=decstatenum, decagg_small=zero, 
                             expagg_big=expstatenum, expagg_small=sampleindex, 
                             actagg=actionagg)
-
+np.random.seed(0)
+random.seed(0)
 optrv = counter.simulate(50, raam.vec2policy(optdecpolicy, actions, decstatenum), \
-                                200).statistics(counter.discount)['mean_return']
+                                400).statistics(counter.discount)['mean_return']
 
 print('Optimal value function\n', optdecvalue.reshape(modecount, poscount).T)
 print('Optimal policy', optdecpolicy.reshape(modecount, poscount).T)
 print('Optimal return', optrv)
 
-## Baseline policy
+# Baseline policy
 
 # get samples
 counter.set_acceptable_modes(1)
-np.random.seed(30)
-random.seed(30)
-samples = counter.simulate(1000, counter.random_policy(),10)
+np.random.seed(20)
+random.seed(20)
+samples = counter.simulate(1000, counter.random_policy(),30)
 counter.set_acceptable_modes(modecount)
 
 basedecvalue, basedecpolicy = srobust.solve_expectation(samples, counter.discount, decstatecount, \
@@ -90,7 +94,9 @@ basedecpolicy[np.where(basedecpolicy > 1)] = 1
 # construct baseline policy
 baselinepol_fun = raam.vec2policy(basedecpolicy, actions, decstatenum)
 
-baserv = counter.simulate(50, baselinepol_fun, 200).statistics(counter.discount)['mean_return']
+np.random.seed(0)
+random.seed(0)
+baserv = counter.simulate(50, baselinepol_fun, 400).statistics(counter.discount)['mean_return']
 
 print('Baseline value function\n', basedecvalue.reshape(modecount, -1).T)
 print('Policy', basedecpolicy.reshape(modecount, -1).T)
@@ -98,26 +104,45 @@ print('Baseline optimal return', baserv)
 
 # TODO: write a test that takes samples and then sums the number of outcomes across states to make sure that they are equal
 
-## Evaluate the regular solution 
+## Regular solution 
 
 np.random.seed(0)
 random.seed(0)
 
-for count in range(1,test_counts):
-    samples = counter.simulate(test_steps, counter.random_policy(),count)
-    
-    expdecvalue, expdecpolicy = srobust.solve_expectation(samples, counter.discount, decstatecount, \
-                                decagg_big=decstatenum, decagg_small=zero, 
-                                expagg_big=expstatenum, expagg_small=sampleindex, 
-                                actagg=actionagg)
-    expdecpolicy[np.where(expdecpolicy < 0)] = 1
-    
-    # compute the number of samples for each expectation state
-    exprv = counter.simulate(50, raam.vec2policy(expdecpolicy, actions, decstatenum),200).statistics(counter.discount)['mean_return']
-    print('Expected value of the expectation policy', expdecvalue[0])
-    print('Return of expectation policy', exprv)
+expectation_results = np.empty((test_counts-1, experiment_runs))
 
-## Compute a reward adjusted solution
+for count in range(1,test_counts):
+    for erun in range(experiment_runs):
+        samples = counter.simulate(test_steps, counter.random_policy(),count)
+        
+        expdecvalue, expdecpolicy = srobust.solve_expectation(samples, counter.discount, decstatecount, \
+                                    decagg_big=decstatenum, decagg_small=zero, 
+                                    expagg_big=expstatenum, expagg_small=sampleindex, 
+                                    actagg=actionagg)
+        expdecpolicy[np.where(expdecpolicy < 0)] = 1
+
+        # compute the number of samples for each expectation state
+        np.random.seed(0)
+        random.seed(0)
+        exprv = counter.simulate(50, raam.vec2policy(expdecpolicy, actions, decstatenum),400).statistics(counter.discount)['mean_return']
+        
+        #print('Expected value of the expectation policy', expdecvalue[0])
+        #print('Return of expectation policy', exprv)
+        
+        expectation_results[count-1, erun] = exprv
+
+xvals = np.arange(1,test_counts)*test_steps
+pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+pp.xlabel('Number of samples')
+pp.ylabel('Return')
+pp.grid()
+pp.show()
+
+## Reward-adjusted solution
+
+imp.reload(srobust)
 
 def err(samples):
     """
@@ -129,88 +154,89 @@ def err(samples):
 maxr = np.max(rewards)
 
 np.random.seed(0)
-samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+random.seed(0)
 
-r = crobust.SRoMDP(1,counter.discount)
-r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
-                expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=actionagg)
+rewadj_results = np.empty((test_counts-1, experiment_runs))
 
-# compute the number of samples for each expectation state
-_, expstateinds = r.expstate_numbers()
-samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
+for count in range(1,test_counts):
+    for erun in range(experiment_runs):
 
-# adjust the rewards *******
-#   every transition is now treated as an outcome (= one sample per outcome)
-#   every expectation state has only one action
-for es, scount in zip(expstateinds, samplecounts):
-    for out in range(r.rmdp.outcome_count(es,0)):
-        r.rmdp.set_reward(es,0,out,0, 
-            r.rmdp.get_reward(es,0,out,0) - 
-            maxr * counter.discount / (1 - counter.discount) * err(scount) )
+        samples = counter.simulate(test_steps, counter.random_policy(),count)
+        
+        expadjdecvalue, expadjdecpolicy = srobust.solve_reward_adjusted(samples, counter.discount, decstatecount, \
+                                    decagg_big=decstatenum, decagg_small=zero, 
+                                    expagg_big=expstatenum, expagg_small=sampleindex, 
+                                    actagg=actionagg, maxr=maxr, err=err, baselinepol=basedecpolicy, 
+                                    baselineval=basedecvalue, baselinerv=baserv)
+                                    
+                                    
+        np.random.seed(0)
+        random.seed(0)
+        rewadjrv = counter.simulate(50, raam.vec2policy(expadjdecpolicy, actions, decstatenum),400).statistics(counter.discount)['mean_return']
+        #print('Expected value of the expectation policy', expadjdecvalue[0])
+        #print('Return of expectation policy', rewadjrv)
 
-# solve sampled MDP
-v,pol,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
+        rewadj_results[count-1, erun] = rewadjrv
 
-expadjdecvalue = r.decvalue(decstatecount, v)
-expadjdecpolicy = r.decpolicy(decstatecount, pol)
-# use a default action when there were no samples for it
-expadjdecpolicy[np.where(expadjdecpolicy < 0)] = 1
+xvals = np.arange(1,test_counts)*test_steps
+pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
 
-# compute the number of samples for each expectation state
-returneval = counter.simulate(50, raam.vec2policy(expadjdecpolicy, actions, decstatenum),120)
-print('Expected value of the expectation policy', expadjdecvalue[0])
-print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
+pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+pp.xlabel('Number of samples')
+pp.ylabel('Return')
+pp.grid()
+pp.show()
 
-## Compute a robust solution
+
+## Robust solution
+
+imp.reload(srobust)
 
 def err(samples):
     """
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.3 / np.sqrt(samples)
+    return 0.25 / np.sqrt(samples)
+
+robust_results = np.empty((test_counts-1, experiment_runs))
 
 np.random.seed(0)
-samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+random.seed(0)
 
-r = crobust.SRoMDP(1,counter.discount)
-r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
-                expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=actionagg)
+for count in range(1,test_counts):
+    for erun in range(experiment_runs):
 
-# compute the number of samples for each expectation state
-_,expstateinds = r.expstate_numbers()
-_,decstateinds = r.decstate_numbers()
-samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
+        samples = counter.simulate(test_steps, counter.random_policy(),count)
+        
+        robdecvalue, robdecpolicy = srobust.solve_reward_adjusted(samples, counter.discount, decstatecount, \
+                                    decagg_big=decstatenum, decagg_small=zero, 
+                                    expagg_big=expstatenum, expagg_small=sampleindex, 
+                                    actagg=actionagg, maxr=maxr, err=err, baselinepol=basedecpolicy, 
+                                    baselineval=basedecvalue, baselinerv=baserv)
+        
+        # compute the number of samples for each expectation state
+        np.random.seed(0)
+        random.seed(0)
+        robrv = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),400).statistics(counter.discount)['mean_return']
+                
+        #print('Expected value of the robust policy', robdecvalue[0])
+        #print('Return of robust policy', robrv)
+        robust_results[count-1, erun] = robrv
 
-r.rmdp.set_uniform_distributions(1.0)
+xvals = np.arange(1,test_counts)*test_steps
+pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
+pp.plot(xvals, robust_results.mean(1),label='Robust')
 
-# *******
-# add transitions to all decision states (even if not sampled)
-#   IMPORTANT: needs to come after getting sample counts
-for es,scount in zip(expstateinds, samplecounts):
-    dist = [1.0] * scount
-    for ds in decstateinds:
-        # TODO: the zero reward here is not exactly right
-        r.rmdp.add_transition(es,0,r.rmdp.outcome_count(es,0),ds,0.0,0.0)
-        dist.append(0)
-    dist = np.array(dist)
-    dist = dist / dist.sum()
-    r.rmdp.set_distribution(es,0,dist,err(scount))
-    
-# solve sampled MDP
-v,pol,_,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
-
-robdecvalue = r.decvalue(decstatecount, v)
-robdecpolicy = r.decpolicy(decstatecount, pol)
-# use a default action when there were no samples for it
-robdecpolicy[np.where(robdecpolicy < 0)] = 1
-
-# compute the number of samples for each expectation state
-returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),200)
-print('Expected value of the expectation policy', robdecvalue[0])
-print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
+pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+pp.xlabel('Number of samples')
+pp.ylabel('Return')
+pp.grid()
+pp.show()
 
 ## Compute the jointly optimized solution (simple baseline approach)
 
