@@ -23,7 +23,9 @@ decstatecount = poscount * modecount
 
 # define test parameters
 test_steps = 50
-test_counts = 40
+test_count_vals = np.arange(1,100,10,dtype=np.int32)
+test_counts = len(test_count_vals)
+
 experiment_runs = 5
 
 # Define state numbering
@@ -111,7 +113,7 @@ random.seed(0)
 
 expectation_results = np.empty((test_counts-1, experiment_runs))
 
-for count in range(1,test_counts):
+for count in test_count_vals:
     for erun in range(experiment_runs):
         samples = counter.simulate(test_steps, counter.random_policy(),count)
         
@@ -158,7 +160,7 @@ random.seed(0)
 
 rewadj_results = np.empty((test_counts-1, experiment_runs))
 
-for count in range(1,test_counts):
+for count in test_count_vals:
     for erun in range(experiment_runs):
 
         samples = counter.simulate(test_steps, counter.random_policy(),count)
@@ -199,19 +201,19 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.25 / np.sqrt(samples)
+    return 0.3 / np.sqrt(samples)
 
 robust_results = np.empty((test_counts-1, experiment_runs))
 
 np.random.seed(0)
 random.seed(0)
 
-for count in range(1,test_counts):
+for count in test_count_vals:
     for erun in range(experiment_runs):
 
         samples = counter.simulate(test_steps, counter.random_policy(),count)
         
-        robdecvalue, robdecpolicy = srobust.solve_reward_adjusted(samples, counter.discount, decstatecount, \
+        robdecvalue, robdecpolicy = srobust.solve_robust(samples, counter.discount, decstatecount, \
                                     decagg_big=decstatenum, decagg_small=zero, 
                                     expagg_big=expstatenum, expagg_small=sampleindex, 
                                     actagg=actionagg, maxr=maxr, err=err, baselinepol=basedecpolicy, 
@@ -226,7 +228,7 @@ for count in range(1,test_counts):
         #print('Return of robust policy', robrv)
         robust_results[count-1, erun] = robrv
 
-xvals = np.arange(1,test_counts)*test_steps
+xvals = test_count_vals*test_steps
 pp.plot(xvals, expectation_results.mean(1),label='Expectation')
 pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
 pp.plot(xvals, robust_results.mean(1),label='Robust')
