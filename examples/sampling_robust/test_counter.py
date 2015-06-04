@@ -59,7 +59,7 @@ r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
 
 
 # solve sampled MDP
-v,pol,_,_ = r.rmdp.mpi_jac(5000,stype=robust.SolutionType.Average.value)
+v,pol,_,_,_ = r.rmdp.mpi_jac(5000,stype=robust.SolutionType.Average.value)
 
 optdecvalue = r.decvalue(decstatecount, v)
 optdecpolicy = r.decpolicy(decstatecount, pol)
@@ -85,7 +85,7 @@ r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
 #r.rmdp.set_uniform_distributions(0.0)
 
 # solve sampled MDP
-v,pol,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
+v,pol,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
 
 basedecvalue = r.decvalue(decstatecount, v)
 basedecpolicy = r.decpolicy(decstatecount, pol).reshape(modecount, poscount)
@@ -116,7 +116,7 @@ r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
                 actagg=actionagg)
 
 # solve sampled MDP
-v,pol,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
+v,pol,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
 
 expdecvalue = r.decvalue(decstatecount, v)
 expdecpolicy = r.decpolicy(decstatecount, pol)
@@ -161,7 +161,7 @@ for es, scount in zip(expstateinds, samplecounts):
             maxr * counter.discount / (1 - counter.discount) * err(scount) )
 
 # solve sampled MDP
-v,pol,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
+v,pol,_,_,_ = r.rmdp.mpi_jac(1000,stype=robust.SolutionType.Average.value)
 
 expadjdecvalue = r.decvalue(decstatecount, v)
 expadjdecpolicy = r.decpolicy(decstatecount, pol)
@@ -211,7 +211,7 @@ for es,scount in zip(expstateinds, samplecounts):
     r.rmdp.set_distribution(es,0,dist,err(scount))
     
 # solve sampled MDP
-v,pol,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
+v,pol,_,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
 
 robdecvalue = r.decvalue(decstatecount, v)
 robdecpolicy = r.decpolicy(decstatecount, pol)
@@ -261,7 +261,7 @@ for es,scount in zip(expstateinds, samplecounts):
     
 
 # solve sampled MDP
-v,pol,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
+v,pol,_,_,_ = r.rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
 
 robdecvalue = r.decvalue(decstatecount, v)
 robdecpolicy = r.decpolicy(decstatecount, pol)
@@ -284,8 +284,18 @@ for ds,ind in zip(decstatenums, decstateinds):
         if basedecpolicy[ds] != a:
             baseline_rmdp.set_reward(ind,a,0,0,-1000)
 
-v,pol,_,_ = baseline_rmdp.mpi_jac(100,stype=robust.SolutionType.Average.value)
+v,pol,_,_,_ = baseline_rmdp.mpi_jac(100,stype=robust.SolutionType.Average.value)
 
 optdecvalue = r.decvalue(decstatecount, v)
 
 print(optdecvalue)
+
+## iterate the value function
+
+# compute baseline action outcome probabilities
+
+# set robust transition probabilities for baseline actions 
+
+# set baseline transitions probabilities (for baseline actions)
+
+# TODO: a simple first step - just set the baseline actions to have 0 error
