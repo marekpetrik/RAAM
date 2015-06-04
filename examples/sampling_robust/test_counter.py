@@ -196,8 +196,6 @@ pp.show()
 
 imp.reload(srobust)
 
-experiment_runs = 3
-
 def err(samples):
     """
     Computes the L1 deviation in the transition probabilities for the given
@@ -244,93 +242,51 @@ pp.show()
 
 ## Combined robust and baseline
 
+imp.reload(srobust)
+
 def err(samples):
     """
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.3 / np.sqrt(samples)
+    return 0.5 / np.sqrt(samples)
+
+combrobust_results = np.empty((test_counts, experiment_runs))
 
 np.random.seed(0)
-samples = counter.simulate(test_steps, counter.random_policy(),test_counts)
+random.seed(0)
 
-r = crobust.SRoMDP(1,counter.discount)
-r.from_samples(samples, decagg_big=decstatenum, decagg_small=zero,
-                expagg_big=expstatenum, expagg_small=sampleindex,
-                actagg=actionagg)
+for i,count in enumerate(test_count_vals):
+    for erun in range(experiment_runs):
 
-# compute the number of samples for each expectation state
-_,expstateinds = r.expstate_numbers()
-decstatenums,decstateinds = r.decstate_numbers()
-samplecounts = [r.rmdp.outcome_count(es,0) for es in expstateinds]
+        samples = counter.simulate(test_steps, counter.random_policy(),count)
+        
+        robdecvalue, robdecpolicy = srobust.solve_robust_joint(samples, counter.discount, decstatecount, \
+                                    decagg_big=decstatenum, decagg_small=zero, 
+                                    expagg_big=expstatenum, expagg_small=sampleindex, 
+                                    actagg=actionagg, maxr=maxr, err=err, baselinepol=basedecpolicy, 
+                                    baselineval=basedecvalue, baselinerv=baserv)
+        
+        # compute the number of samples for each expectation state
+        np.random.seed(0)
+        random.seed(0)
+        crobrv = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),400).statistics(counter.discount)['mean_return']
+                
+        #print('Expected value of the robust policy', robdecvalue[0])
+        #print('Return of robust policy', robrv)
+        combrobust_results[i, erun] = crobrv
 
-r.rmdp.set_uniform_distributions(1.0)
+xvals = test_count_vals*test_steps
+pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
+pp.plot(xvals, robust_results.mean(1),label='Robust')
+pp.plot(xvals, combrobust_results.mean(1),label='Robust Comb')
 
-# *******
-# add transitions to all decision states (even if not sampled)
-#   IMPORTANT: needs to come after getting sample counts
-for es,scount in zip(expstateinds, samplecounts):
-    dist = [1.0] * scount
-    for ds in decstateinds:
-        r.rmdp.add_transition(es,0,r.rmdp.outcome_count(es,0),ds,0.0,0.0)
-        dist.append(0)
-    dist = np.array(dist)
-    dist = dist / dist.sum()
-    r.rmdp.set_distribution(es,0,dist,err(scount))
+pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
 
-
-# set policies according to the baseline transitions
-# TODO: this is a quite bit of a hack and may not lead to the optimal solution    
-rmdp = r.rmdp.copy()
-for ds,ind in zip(decstatenums, decstateinds):
-    a = basedecpolicy[ds] 
-    # get the expectation state that corresponds to the baseline policy
-    # assumes that all transitions are to the same state
-    expind = rmdp.get_toid(ind,a,0,0)
-    # set the threshold to be small for this transition
-    rmdp.set_threshold(expind,0,0.0)
-
-# solve sampled MDP
-v,pol,_,_,_ = rmdp.mpi_jac_l1(100,stype=robust.SolutionType.Robust.value)
-
-robdecvalue = r.decvalue(decstatecount, v)
-robdecpolicy = r.decpolicy(decstatecount, pol)
-# use a default action when there were no samples for it
-robdecpolicy[np.where(robdecpolicy < 0)] = 0
-
-# compute the number of samples for each expectation state
-returneval = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),200)
-
-print(robdecvalue)
-
-print('Expected value of the expectation policy', robdecvalue[0])
-print('Return of expectation policy', returneval.statistics(counter.discount)['mean_return'])
-
-
-# ********
-## now compute the baseline optimistic policy
-
-baseline_rmdp = r.rmdp.copy()
-
-# make all transitions that do not represent the baseline policy appear bad
-for ds,ind in zip(decstatenums, decstateinds):
-    for a in range(baseline_rmdp.action_count(ind)):
-        # add a bad reward if the action is not a baseline action
-        if basedecpolicy[ds] != a:
-            baseline_rmdp.set_reward(ind,a,0,0,-1000)
-
-v,pol,_,_,_ = baseline_rmdp.mpi_jac(100,stype=robust.SolutionType.Average.value)
-
-optdecvalue = r.decvalue(decstatecount, v)
-
-print(optdecvalue)
-
-## Iterative solution method for the value function
-
-# compute baseline action outcome probabilities
-
-# set robust transition probabilities for baseline actions 
-
-# set baseline transitions probabilities (for baseline actions)
-
-# TODO: a simple first step - just set the baseline actions to have 0 error
+pp.legend(loc = 0)
+pp.xlabel('Number of samples')
+pp.ylabel('Return')
+pp.grid()
+pp.show()
