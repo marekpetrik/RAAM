@@ -162,10 +162,10 @@ def solve_robust_joint(samples, discount, decstatecount, decagg_big, decagg_smal
             rmdp.set_threshold(expind,0,0.0)
         else:
             # TODO: a hack - just add the missing baseline action with a good return -> take it
-            rmdp.add_transition(ind,a,0,ind,1.0,5.0)
+            rmdp.add_transition(ind,a,0,ind,1.0,10.0)
             dist = np.array([1.0])
             dist = dist / dist.sum()
-            r.rmdp.set_distribution(ind,a,dist,0.0)
+            rmdp.set_distribution(ind,a,dist,1.0)
 
     
     # solve sampled MDP

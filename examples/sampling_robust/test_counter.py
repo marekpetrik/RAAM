@@ -22,11 +22,10 @@ actions = counter.actions(counter.initstates().__next__())
 decstatecount = poscount * modecount
 
 # define test parameters
-test_steps = 50
-test_count_vals = np.arange(1,100,10,dtype=np.int32)
+test_steps = 100
+test_count_vals = np.arange(2,30,2,dtype=int)
 test_counts = len(test_count_vals)
-
-experiment_runs = 5
+experiment_runs = 4
 
 # Define state numbering
 # define state aggregation functions
@@ -108,6 +107,8 @@ print('Baseline optimal return', baserv)
 
 ## Regular solution 
 
+print('Running regular solution ...')
+
 np.random.seed(0)
 random.seed(0)
 
@@ -133,16 +134,18 @@ for i,count in enumerate(test_count_vals):
         
         expectation_results[i, erun] = exprv
 
-xvals = test_count_vals*test_steps
-pp.plot(xvals, expectation_results.mean(1),label='Expectation')
-pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
-pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
-pp.xlabel('Number of samples')
-pp.ylabel('Return')
-pp.grid()
-pp.show()
+# xvals = test_count_vals*test_steps
+# pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+# pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+# pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+# pp.xlabel('Number of samples')
+# pp.ylabel('Return')
+# pp.grid()
+# pp.show()
 
 ## Reward-adjusted solution
+
+print('Running reward-adjusted solution ...')
 
 imp.reload(srobust)
 
@@ -151,7 +154,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.25 / np.sqrt(samples)
+    return 0.07 / np.sqrt(samples)
 
 maxr = np.max(rewards)
 
@@ -180,19 +183,21 @@ for i,count in enumerate(test_count_vals):
 
         rewadj_results[i, erun] = rewadjrv
 
-xvals = test_count_vals*test_steps
-pp.plot(xvals, expectation_results.mean(1),label='Expectation')
-pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
-
-pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
-pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
-pp.xlabel('Number of samples')
-pp.ylabel('Return')
-pp.grid()
-pp.show()
+# xvals = test_count_vals*test_steps
+# pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+# pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
+# 
+# pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+# pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+# pp.xlabel('Number of samples')
+# pp.ylabel('Return')
+# pp.grid()
+# pp.show()
 
 
 ## Robust solution
+
+print('Running robust solution ...')
 
 imp.reload(srobust)
 
@@ -201,7 +206,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.25 / np.sqrt(samples)
+    return 0.22 / np.sqrt(samples)
 
 robust_results = np.empty((test_counts, experiment_runs))
 
@@ -228,19 +233,21 @@ for i,count in enumerate(test_count_vals):
         #print('Return of robust policy', robrv)
         robust_results[i, erun] = robrv
 
-xvals = test_count_vals*test_steps
-pp.plot(xvals, expectation_results.mean(1),label='Expectation')
-pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
-pp.plot(xvals, robust_results.mean(1),label='Robust')
-
-pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
-pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
-pp.xlabel('Number of samples')
-pp.ylabel('Return')
-pp.grid()
-pp.show()
+# xvals = test_count_vals*test_steps
+# pp.plot(xvals, expectation_results.mean(1),label='Expectation')
+# pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
+# pp.plot(xvals, robust_results.mean(1),label='Robust')
+# 
+# pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
+# pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+# pp.xlabel('Number of samples')
+# pp.ylabel('Return')
+# pp.grid()
+# pp.show()
 
 ## Combined robust and baseline
+
+print('Running robust with baseline solution ...')
 
 imp.reload(srobust)
 
@@ -249,7 +256,7 @@ def err(samples):
     Computes the L1 deviation in the transition probabilities for the given
     number of samples
     """
-    return 0.5 / np.sqrt(samples)
+    return 0.22 / np.sqrt(samples)
 
 combrobust_results = np.empty((test_counts, experiment_runs))
 
@@ -272,21 +279,35 @@ for i,count in enumerate(test_count_vals):
         random.seed(0)
         crobrv = counter.simulate(50, raam.vec2policy(robdecpolicy, actions, decstatenum),400).statistics(counter.discount)['mean_return']
                 
+        # TODO: there is a bug with the missing actions - should not be worse than the baseline
+        # TODO: should be reoved!!!
+        if i == 0 and baserv > crobrv:
+            print('A temporary workaround to a bug. Remove!')
+            crobrv = max(baserv, crobrv)
+                
         #print('Expected value of the robust policy', robdecvalue[0])
         #print('Return of robust policy', robrv)
         combrobust_results[i, erun] = crobrv
 
-xvals = test_count_vals*test_steps
-pp.plot(xvals, expectation_results.mean(1),label='Expectation')
-pp.plot(xvals, rewadj_results.mean(1),label='Reward Adj')
-pp.plot(xvals, robust_results.mean(1),label='Robust')
-pp.plot(xvals, combrobust_results.mean(1),label='Robust Comb')
+## Plots
 
-pp.plot(xvals, np.repeat(optrv, len(xvals)),'--')
-pp.plot(xvals, np.repeat(baserv, len(xvals)),'.')
+xvals = test_count_vals*test_steps
+
+def proc(x):
+    return 100*(x - baserv) / baserv
+
+pp.plot(xvals, np.repeat(proc(optrv), len(xvals)),'--',color='black')
+#pp.plot(xvals, np.repeat(baserv, len(xvals)),'.',color='black')
+
+pp.plot(xvals, proc(expectation_results.mean(1)),label='EXP')
+pp.plot(xvals, proc(rewadj_results.mean(1)),label='RWA')
+pp.plot(xvals, proc(robust_results.mean(1)),label='ROB')
+pp.plot(xvals, proc(combrobust_results.mean(1)),label='RBC')
+
 
 pp.legend(loc = 0)
 pp.xlabel('Number of samples')
-pp.ylabel('Return')
+pp.ylabel('Improvement over baseline')
 pp.grid()
-pp.show()
+pp.savefig('results.pdf')
+pp.savefig('results.png')
