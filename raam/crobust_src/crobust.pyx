@@ -5,14 +5,14 @@ import numpy as np
 cimport numpy as np
 from libcpp.vector cimport vector
 from libcpp.string cimport string
-from libcpp.utility cimport pair, tuple
+from libcpp.utility cimport pair
 from libcpp cimport bool
 import statistics
 from collections import namedtuple 
 from math import sqrt
 import warnings 
 
-cdef extern from "../../craam/include/RMDP.hpp":
+cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
     pair[vector[double],double] worstcase_l1(const vector[double] & z, 
                                             const vector[double] & q, double t)
 
