@@ -24,7 +24,6 @@ iterations = 5                  # number of iterations of sampling and optimizat
 print('Simulation parameter bounds: horizon %d, runs %d, samples %d, eval samples %d' \
         % (horizon,runs,sample_count,eval_sample_count))
 
-
 ## Solve on-policy with occupancy frequency weights
 
 # construct an initial random policy

@@ -16,6 +16,12 @@ class Counter(raam.simulator.Simulator):
     Initial (decision) state: 0
     Actions: {plus, minus}
     Rewards: succ_prob%: next position, 1-succ_prob% this position in chain
+
+    Parameters
+    ----------
+    succ_prob : float
+        Success probability of the action taken; otherwise the transition does
+        not happen.
     """
     def __init__(self,succ_prob=0.9):
         self.succ_prob = succ_prob
@@ -56,6 +62,12 @@ class StatefulCounter(raam.simulator.StatefulSimulator):
     Initial (decision) state: 0
     Actions: {plus, minus}
     Rewards: succ_prob%: next position, 1-succ_prob% this position in chain
+
+    Parameters
+    ----------
+    succ_prob : float
+        Success probability of the action taken; otherwise the transition does
+        not happen.
     """
 
     def __init__(self, succ_prob=0.9):

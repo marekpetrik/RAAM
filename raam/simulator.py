@@ -51,6 +51,7 @@ from raam.samples import DecSample, ExpSample
 import itertools
 import collections
 import random
+import numbers
 
 class Simulator(metaclass=abc.ABCMeta):
     """
@@ -236,20 +237,23 @@ class Simulator(metaclass=abc.ABCMeta):
         if samples is None:
             samples = raam.samples.MemSamples()
     
-        if type(runs) == int:
+        if isinstance(runs,numbers.Integral):
             runs = range(runs)
+        elif not isinstance(runs,collections.Iterable):
+            raise ValueError("Parameter 'runs' must be either int or iterable")
+            
         
         if initstates is None:
             initstates = simulator.initstates()
     
-        if type(startsteps) == int:
+        if isinstance(startsteps,numbers.Integral):
             startsteps = itertools.repeat(startsteps, len(runs))
     
         if end_condition is None:
             end_condition = simulator.end_condition
     
         if not isinstance(initstates,collections.Iterable):
-            raise ValueError('Initstates must be iterable')
+            raise ValueError("Parameter 'initstates' must be iterable")
     
         # the total number of transitions sampled
         transitions = 0
@@ -765,13 +769,13 @@ class StatefulSimulator(metaclass=abc.ABCMeta):
         if samples is None:
             samples = raam.samples.MemSamples()
     
-        if type(runs) == int:
+        if isinstance(runs, numbers.Integral):
             runs = range(runs)
         
         if initparams is None:
             initparams = itertools.repeat(None)
     
-        if type(startsteps) == int:
+        if isinstance(startsteps, numbers.Integral):
             startsteps = itertools.repeat(startsteps, len(runs))
     
         if end_condition is None:

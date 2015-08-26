@@ -11,6 +11,7 @@ import math
 import copy
 import raam.samples
 
+
 def apply_dec(samples,features):
     """
     Returns new samples with the given features applied to decision states
