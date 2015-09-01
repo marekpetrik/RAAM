@@ -25,7 +25,7 @@ decstatecount = poscount * modecount
 test_steps = 100
 test_count_vals = np.arange(2,30,2,dtype=int)
 test_counts = len(test_count_vals)
-experiment_runs = 4
+experiment_runs = 20
 
 # Define state numbering
 # define state aggregation functions
