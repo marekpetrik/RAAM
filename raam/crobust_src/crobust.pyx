@@ -16,11 +16,6 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
     pair[vector[double],double] worstcase_l1(const vector[double] & z, 
                                             const vector[double] & q, double t)
 
-    ctypedef enum SolutionType:
-        Robust = 0
-        Optimistic = 1 
-        Average = 2
-
     cdef cppclass Solution:
         vector[double] valuefunction
         vector[long] policy
@@ -67,14 +62,26 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         
         Transition get_transition(long stateid,long actionid,long outcomeid) except +
 
-        Solution vi_gs(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual, SolutionType type) except +
-        Solution vi_gs_l1(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual, SolutionType type) except +
+        Solution vi_gs_rob(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        Solution vi_gs_opt(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        Solution vi_gs_ave(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        
+        Solution vi_gs_l1_rob(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        Solution vi_gs_l1_opt(vector[double] valuefunction, double discount, unsigned long iterations, double maxresidual) except +
 
-        Solution vi_jac(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual, SolutionType type) except +
-        Solution vi_jac_l1(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual, SolutionType type) except +
+        Solution vi_jac_rob(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        Solution vi_jac_opt(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        Solution vi_jac_ave(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        
+        Solution vi_jac_l1_rob(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual) except +
+        Solution vi_jac_l1_opt(const vector[double] & valuefunction, double discount, unsigned long iterations, double maxresidual) except +
 
-        Solution mpi_jac(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual, SolutionType type) except +
-        Solution mpi_jac_l1(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual, SolutionType type) except +
+        Solution mpi_jac_rob(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
+        Solution mpi_jac_opt(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
+        Solution mpi_jac_ave(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
+        
+        Solution mpi_jac_l1_rob(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
+        Solution mpi_jac_l1_opt(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
 
         void transitions_to_csv_file(const string & filename, bool header) except +
         string to_string() except +
@@ -275,18 +282,19 @@ cdef class RoMDP:
         elif valuefunction.shape[0] != self.thisptr.state_count():
             raise ValueError('Value function dimensions must match the number of states.')
 
-        cdef SolutionType st;
+        cdef Solution sol
+
         if stype == 0:
-            st = Robust
+            sol = self.thisptr.vi_gs_rob(valuefunction,self.discount,iterations,maxresidual)
         elif stype == 1:
-            st = Optimistic
+            sol = self.thisptr.vi_gs_opt(valuefunction,self.discount,iterations,maxresidual)
         elif stype == 2:
-            st = Average
+            sol = self.thisptr.vi_gs_ave(valuefunction,self.discount,iterations,maxresidual)
+        else:
+            raise ValueError("Incorrect solution type '%s'." )
  
-        cdef Solution sol = self.thisptr.vi_gs(valuefunction,self.discount,iterations,maxresidual,st)
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcomes
-        
 
     cpdef vi_gs_l1(self, int iterations, valuefunction = np.empty(0), \
                     double maxresidual=0, int stype=0):
@@ -308,8 +316,8 @@ cdef class RoMDP:
         maxresidual : double, optional
             Maximal residual at which the iterations stop. A negative value
             will ensure the necessary number of iterations.
-        stype : int  {0, 1, 2}, optional
-            Robust (0) or optimistic (1) solution or (2) average solution. One
+        stype : int  {0, 1}, optional
+            Robust (0) or optimistic (1) solution. One
             can use e.g. robust.SolutionType.Robust.value.
             
         Returns
@@ -332,16 +340,15 @@ cdef class RoMDP:
         elif valuefunction.shape[0] != self.thisptr.state_count():
             raise ValueError('Value function dimensions must match the number of states.')
 
-        cdef SolutionType st;
-        if stype == 0:
-            st = Robust
-        elif stype == 1:
-            st = Optimistic
-        elif stype == 2:
-            st = Average
- 
-        cdef Solution sol = self.thisptr.vi_gs_l1(valuefunction,self.discount,iterations,maxresidual,st)
+        cdef Solution sol
         
+        if stype == 0:
+            sol = self.thisptr.vi_gs_l1_rob(valuefunction,self.discount,iterations,maxresidual)
+        elif stype == 1:
+            sol = self.thisptr.vi_gs_l1_opt(valuefunction,self.discount,iterations,maxresidual)
+        else:
+            raise ValueError("Incorrect solution type '%s'." )
+            
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcome_dists
         
@@ -387,15 +394,16 @@ cdef class RoMDP:
         elif valuefunction.shape[0] != self.thisptr.state_count():
             raise ValueError('Value function dimensions must match the number of states.')        
                 
-        cdef SolutionType st;
+        cdef Solution sol
         if stype == 0:
-            st = Robust
+            sol = self.thisptr.vi_jac_rob(valuefunction,self.discount,iterations,maxresidual)
         elif stype == 1:
-            st = Optimistic
+            sol = self.thisptr.vi_jac_opt(valuefunction,self.discount,iterations,maxresidual)
         elif stype == 2:
-            st = Average
-
-        cdef Solution sol = self.thisptr.vi_jac(valuefunction,self.discount,iterations,maxresidual,st)
+            sol = self.thisptr.vi_jac_ave(valuefunction,self.discount,iterations,maxresidual)
+        else:
+            raise ValueError("Incorrect solution type '%s'." )
+            
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcomes
 
@@ -417,8 +425,8 @@ cdef class RoMDP:
         maxresidual : double
             Maximal residual at which the iterations stop. A negative value
             will ensure the necessary number of iterations.
-        stype : int  (0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average solution. One
+        stype : int  (0, 1}
+            Robust (0) or optimistic (1) solution. One
             can use e.g. robust.SolutionType.Robust.value.
             
         Returns
@@ -441,15 +449,14 @@ cdef class RoMDP:
         elif valuefunction.shape[0] != self.thisptr.state_count():
             raise ValueError('Value function dimensions must match the number of states.')
 
-        cdef SolutionType st;
+        cdef Solution sol
         if stype == 0:
-            st = Robust
+            sol = self.thisptr.vi_jac_l1_rob(valuefunction,self.discount,iterations,maxresidual)
         elif stype == 1:
-            st = Optimistic
-        elif stype == 2:
-            st = Average
-
-        cdef Solution sol = self.thisptr.vi_jac_l1(valuefunction,self.discount,iterations,maxresidual,st)
+            sol = self.thisptr.vi_jac_l1_opt(valuefunction,self.discount,iterations,maxresidual)
+        else:
+            raise ValueError("Incorrect solution type '%s'." )
+        
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcome_dists
 
@@ -500,16 +507,16 @@ cdef class RoMDP:
         # TODO: what it the best value to use here?
         cdef double valresidual = maxresidual / 2
 
-        cdef SolutionType st;
+        cdef Solution sol
         if stype == 0:
-            st = Robust
+            sol = self.thisptr.mpi_jac_rob(valuefunction,self.discount,iterations,maxresidual,valiterations,valresidual)
         elif stype == 1:
-            st = Optimistic
+            sol = self.thisptr.mpi_jac_opt(valuefunction,self.discount,iterations,maxresidual,valiterations,valresidual)
         elif stype == 2:
-            st = Average
+            sol = self.thisptr.mpi_jac_ave(valuefunction,self.discount,iterations,maxresidual,valiterations,valresidual)
+        else:
+            raise ValueError("Incorrect solution type '%s'." )            
 
-        cdef Solution sol = self.thisptr.mpi_jac(valuefunction,self.discount,iterations,maxresidual,\
-                                                        valiterations, valresidual,st)
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcomes
 
@@ -534,8 +541,8 @@ cdef class RoMDP:
             will ensure the necessary number of iterations.
         valiterations : int, optional
             Maximal number of iterations for value function computation
-        stype : int  (0, 1, 2}
-            Robust (0) or optimistic (1) solution or (2) average solution. One
+        stype : int  (0, 1}
+            Robust (0) or optimistic (1) solution. One
             can use e.g. robust.SolutionType.Robust.value.
             
         Returns
@@ -561,17 +568,13 @@ cdef class RoMDP:
         # TODO: what it the best value to use here?
         cdef double valresidual = maxresidual / 2
 
-        cdef SolutionType st;
+        cdef Solution sol
         if stype == 0:
-            st = Robust
+            sol = self.thisptr.mpi_jac_l1_rob(valuefunction,self.discount,iterations,maxresidual,valiterations, valresidual)
         elif stype == 1:
-            st = Optimistic
-        elif stype == 2:
-            st = Average
-
-        cdef Solution sol = self.thisptr.mpi_jac_l1(valuefunction,self.discount,iterations,maxresidual,\
-                                                    valiterations, valresidual, st)
-                                                    
+            sol = self.thisptr.mpi_jac_l1_opt(valuefunction,self.discount,iterations,maxresidual,valiterations, valresidual)
+        else:
+            raise ValueError("Incorrect solution type '%s'." )            
 
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual,\
                 sol.iterations, sol.outcome_dists
