@@ -291,7 +291,7 @@ cdef class RoMDP:
         elif stype == 2:
             sol = self.thisptr.vi_gs_ave(valuefunction,self.discount,iterations,maxresidual)
         else:
-            raise ValueError("Incorrect solution type '%s'." )
+            raise ValueError("Incorrect solution type '%s'." % stype )
  
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcomes
@@ -347,7 +347,7 @@ cdef class RoMDP:
         elif stype == 1:
             sol = self.thisptr.vi_gs_l1_opt(valuefunction,self.discount,iterations,maxresidual)
         else:
-            raise ValueError("Incorrect solution type '%s'." )
+            raise ValueError("Incorrect solution type '%s'."  % stype )
             
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcome_dists
@@ -402,7 +402,7 @@ cdef class RoMDP:
         elif stype == 2:
             sol = self.thisptr.vi_jac_ave(valuefunction,self.discount,iterations,maxresidual)
         else:
-            raise ValueError("Incorrect solution type '%s'." )
+            raise ValueError("Incorrect solution type '%s'."  % stype )
             
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcomes
@@ -455,7 +455,7 @@ cdef class RoMDP:
         elif stype == 1:
             sol = self.thisptr.vi_jac_l1_opt(valuefunction,self.discount,iterations,maxresidual)
         else:
-            raise ValueError("Incorrect solution type '%s'." )
+            raise ValueError("Incorrect solution type '%s'."  % stype )
         
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcome_dists
@@ -515,7 +515,7 @@ cdef class RoMDP:
         elif stype == 2:
             sol = self.thisptr.mpi_jac_ave(valuefunction,self.discount,iterations,maxresidual,valiterations,valresidual)
         else:
-            raise ValueError("Incorrect solution type '%s'." )            
+            raise ValueError("Incorrect solution type '%s'."  % stype )            
 
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
                 sol.iterations, sol.outcomes
@@ -574,7 +574,7 @@ cdef class RoMDP:
         elif stype == 1:
             sol = self.thisptr.mpi_jac_l1_opt(valuefunction,self.discount,iterations,maxresidual,valiterations, valresidual)
         else:
-            raise ValueError("Incorrect solution type '%s'." )            
+            raise ValueError("Incorrect solution type '%s'."  % stype )            
 
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual,\
                 sol.iterations, sol.outcome_dists
