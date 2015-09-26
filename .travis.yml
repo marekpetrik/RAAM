@@ -13,14 +13,19 @@ addons:
             - gcc-4.9
             - g++-4.9
 
+before_install:
+    - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+    - chmod +x miniconda.sh
+    - ./miniconda.sh -b
+    - export PATH=/home/travis/miniconda/bin:$PATH
+    - conda update --yes conda
+
 install:
-    - pip3 install numpy
-    - pip3 install scipy
-    - pip3 install setuptools
-    - pip3 install cython 
+    - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy cython setuptools
+    - python setup.py install
 
 script:
     - export CC=/usr/bin/gcc-4.9
     - export CXX=/usr/bin/g++-4.9
-    - python3 setup.py develop --user
+    - python3 setup.py install
     - python3 -mraam.test
