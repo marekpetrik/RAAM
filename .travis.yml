@@ -16,10 +16,13 @@ addons:
             - python3-numpy
             - python3-scipy
             - python3-pip 
+            - python3-setuptools
 
 install:
-    - pip install cython --user
+    - pip3 install cython --user
 
 script:
+    - export CC=/usr/bin/gcc-4.9
+    - export CXX=/usr/bin/g++-4.9
     - ./setup.py develop --user
     - python3 -mraam.test
