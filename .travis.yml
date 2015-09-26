@@ -1,8 +1,8 @@
-language: Python
+language: python
 
-compiler:
-    - gcc
-    
+python:
+    - "3.4"
+ 
 sudo: false
 
 addons:
