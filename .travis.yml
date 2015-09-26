@@ -26,5 +26,5 @@ install:
 script:
     - export CC=/usr/bin/gcc-4.9
     - export CXX=/usr/bin/g++-4.9
-    - python3 setup.py install
+    - python3 setup.py install --user
     - python3 -mraam.test
