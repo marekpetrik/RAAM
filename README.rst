@@ -32,7 +32,7 @@ Requirements:
 - Setuptools 7.0
 - Numpy 1.8+
 - Scipy 0.13 
-- Cython 0.21+ and GCC 4.7+ or LLVM or another compiler with C++11 support
+- Cython 0.21+ and GCC 4.9+ or LLVM or another compiler with C++11 support
 
 The package has been tested only on Linux, but should also work on Windows and Mac.
 
