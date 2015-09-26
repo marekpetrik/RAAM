@@ -19,7 +19,7 @@ addons:
             - python3-setuptools
 
 install:
-    - pip3 install cython --user
+    - pip3 install cython 
 
 script:
     - export CC=/usr/bin/gcc-4.9
