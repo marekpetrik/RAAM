@@ -645,9 +645,10 @@ cdef class RoMDP:
         Parameters
         ----------
         transitions : np.ndarray[double,double,double] (n x n x m)
-            Each row represents a transition for the specified state, the
-            third dimension is used to represent the transition probabilities
-            for specific outcomes and actions.
+            The last dimension represents the actions and outcomes as defined by
+            the parameters `action` and `outcomes'. The first dimension represents
+            the originating state in a transition and the second dimension represents
+            the target state.
         rewards : np.ndarray[double, double] (n x m)
             The rewards for each state and action
         actions : np.ndarray[long] (m)

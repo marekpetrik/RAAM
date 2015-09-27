@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 from setuptools import setup
 import subprocess
 
@@ -41,7 +41,7 @@ setup(
     version=version,
     author='Marek Petrik',
     author_email='marekpetrik@gmail.com',
-    packages=['raam','raam.test','raam.examples', 'raam.plotting'],
+    packages=['raam','raam.test','raam.examples', 'raam.examples.inventory', 'raam.plotting'],
     scripts=[],
     url='http://watson.ibm.com',
     license='LICENSE',
