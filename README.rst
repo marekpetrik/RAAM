@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/marekpetrik/RAAM.svg
+    :target: https://travis-ci.org/marekpetrik/RAAM
+
 ======================================================
 RAAM: Robust and Approximate Markov Decision Processes
 ======================================================
