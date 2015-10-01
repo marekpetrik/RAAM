@@ -1,11 +1,15 @@
 # distutils: language = c++
-# distutils: sources = craam/src/RMDP.cpp craam/src/Action.cpp craam/src/definitions.cpp craam/src/State.cpp craam/src/Transition.cpp
+# libraries: craam
+# libraries_dirs: ../../craam/bin
+# include_dirs: ../../craam/include
+
 
 import numpy as np 
 cimport numpy as np
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libcpp.utility cimport pair
+from libcpp.memory cimport shared_ptr
 from libcpp cimport bool
 import statistics
 from collections import namedtuple 
@@ -87,6 +91,15 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         string to_string() except +
 
         void copy_into(RMDP& target) except + 
+
+
+cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
+    
+    cdef cppclass MDPI_R:
+        
+        MDPI_R(const shared_ptr[const RMDP]& mdp, const vector[long]& observ2state, const Transition& initial);
+        const RMDP& get_robust_mdp() except +
+
 
 cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
     """
