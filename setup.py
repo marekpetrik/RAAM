@@ -28,6 +28,7 @@ ext_modules = [
         "raam.crobust",
         ["raam/crobust_src/crobust.pyx"],
         extra_compile_args = ['-std=c++11','-fopenmp','-Ofast','-march=native'],
+        libraries
         extra_link_args=['-fopenmp'],
         include_dirs = [numpy.get_include(),'craam/include']),
     Extension(

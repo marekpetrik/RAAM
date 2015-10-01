@@ -1,7 +1,7 @@
 # distutils: language = c++
-# libraries: craam
-# libraries_dirs: ../../craam/bin
-# include_dirs: ../../craam/include
+# distutils: libraries = craam
+# distutils: library_dirs = ../../craam/bin
+# distutils: include_dirs = ../../craam/include
 
 
 import numpy as np 
