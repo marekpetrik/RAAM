@@ -29,7 +29,9 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         long iterations
 
     cdef cppclass Transition:
-        
+
+        Transition() 
+        Transition(const vector[long]& indices, const vector[double]& probabilities, const vector[double]& rewards);
 
         vector[long] indices
         vector[double] probabilities
@@ -37,6 +39,7 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         double prob_sum
 
     cdef cppclass RMDP:
+
         RMDP(int state_count) except +
 
         void add_transition(long fromid, long actionid, long outcomeid, 
@@ -182,7 +185,7 @@ cdef class RoMDP:
         """
         self.thisptr.add_transition(fromid, actionid, outcomeid, toid, probability, reward)
 
-    cpdef add_transition_nonrobust(self, long fromid, long actionid, long toid, double probability, double reward):
+    cpdef add_transition_d(self, long fromid, long actionid, long toid, double probability, double reward):
         """
         Adds a single transition sample using outcome with id = 0. This function
         is meant to be used for constructing a non-robust MDP.
@@ -201,6 +204,14 @@ cdef class RoMDP:
             Reward associated with the transition
         """        
         self.thisptr.add_transition(fromid, actionid, 0, toid, probability, reward)
+
+    
+    cpdef add_transition_nonrobust(self, long fromid, long actionid, long toid, double probability, double reward):
+        """
+        Deprecated, use add_transition_d
+        """
+        self.thisptr.add_transition(fromid, actionid, 0, toid, probability, reward)
+
 
     cpdef set_distribution(self, long fromid, long actionid, np.ndarray[double] distribution, double threshold):
         """
@@ -1189,17 +1200,29 @@ cdef class MDPIR:
     """
 
     cdef MDPI_R *thisptr
+    cdef double discount
     
-    def __cinit__(self, mdp, np.ndarray[double] state2obs, np.ndarray[double] initial):
+    def __cinit__(self, RoMDP mdp, np.ndarray[double] state2obs, np.ndarray[double] initial):
 
-        cdef int states = mdp.state_count()
-        if states != state2obs.size():
+        cdef long states = mdp.state_count()
+        
+        if states != state2obs.size:
             raise ValueError('The number of MDP states must equal to the size of state2obs.')
-        if state2obs.size() != initial.size():
+        if state2obs.size != initial.size:
             raise ValueError('Sizes of state2obs and initial must be the same.')
 
         # construct the initial distribution
-        cdef Transition initial_t(np.arange(states),initial,np.zeros(states))
+        cdef Transition initial_t = Transition(np.arange(states),initial,np.zeros(states))
 
-        self.thisptr = new MDPI_R(mdp, observations, initial_t)
-            
+        self.thisptr = new MDPI_R((mdp.thisptr)[0], state2obs, initial_t)
+
+    def __init__(self, RoMDP mdp, np.ndarray[double] state2obs, np.ndarray[double] initial):
+        self.discount = mdp.discount
+
+    def get_robust(self):
+        """
+        Returns the robust representation of the implementable MDP
+        """
+        cdef RoMDP result = RoMDP(0, self.discount)
+        result.thisptr[0] = self.thisptr.get_robust_mdp()
+        return result
