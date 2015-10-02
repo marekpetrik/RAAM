@@ -1,6 +1,6 @@
 # distutils: language = c++
 # distutils: libraries = craam
-# distutils: library_dirs = ../../craam/bin
+# distutils: library_dirs = craam/lib
 # distutils: include_dirs = ../../craam/include
 
 
@@ -29,6 +29,8 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         long iterations
 
     cdef cppclass Transition:
+        
+
         vector[long] indices
         vector[double] probabilities
         vector[double] rewards
@@ -96,10 +98,10 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
 cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
     
     cdef cppclass MDPI_R:
-        
-        MDPI_R(const shared_ptr[const RMDP]& mdp, const vector[long]& observ2state, const Transition& initial);
-        const RMDP& get_robust_mdp() except +
+    
+        MDPI_R(const RMDP& mdp, const vector[long]& observ2state, const Transition& initial);
 
+        const RMDP& get_robust_mdp() except +
 
 cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
     """
@@ -152,10 +154,8 @@ cdef class RoMDP:
 
     def __cinit__(self, int statecount, double discount):
         self.thisptr = new RMDP(statecount)
-        self.discount = discount        
 
     def __init__(self, int statecount, double discount):
-        self.thisptr = new RMDP(statecount)
         self.discount = discount
         
     def __dealloc__(self):
@@ -815,7 +815,7 @@ class SRoMDP:
     Parameters
     ----------
     states : int
-        Initial number of states. State space is automaticaly expanded when more
+        Initial number of states. State space is automatically expanded when more
         samples become available.
     discount : float
         Discount factor used in the MDP.
@@ -1167,3 +1167,39 @@ class SRoMDP:
         """
         
         return list( zip(*self.statemaps.decstate2state.items()) )
+
+
+cdef class MDPIR:
+    """
+    MDP with Implementability constraints. The implementability constraints
+    require states within a single observation to have the same action
+    chosen by the policy.
+
+    Uses solution methods based on solving a robust MDP.
+
+    Parameters
+    ----------
+    mdp : RoMDP
+        Base MDP
+    state2obs : np.ndarray
+        Maps states to observation indexes. The observation index is 0-based
+        and two states. The optimal 
+    initial : np.ndarray
+        The initial distribution
+    """
+
+    cdef MDPI_R *thisptr
+    
+    def __cinit__(self, mdp, np.ndarray[double] state2obs, np.ndarray[double] initial):
+
+        cdef int states = mdp.state_count()
+        if states != state2obs.size():
+            raise ValueError('The number of MDP states must equal to the size of state2obs.')
+        if state2obs.size() != initial.size():
+            raise ValueError('Sizes of state2obs and initial must be the same.')
+
+        # construct the initial distribution
+        cdef Transition initial_t(np.arange(states),initial,np.zeros(states))
+
+        self.thisptr = new MDPI_R(mdp, observations, initial_t)
+            
