@@ -1400,5 +1400,3 @@ class TestImplementable(unittest.TestCase):
 
         rmdp = mdpi.get_robust()
         self.assertEqual(rmdp.state_count(),1)
-        
-        
