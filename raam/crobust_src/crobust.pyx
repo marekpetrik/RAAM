@@ -1202,7 +1202,7 @@ cdef class MDPIR:
     cdef MDPI_R *thisptr
     cdef double discount
     
-    def __cinit__(self, RoMDP mdp, np.ndarray[double] state2obs, np.ndarray[double] initial):
+    def __cinit__(self, RoMDP mdp, np.ndarray[long] state2obs, np.ndarray[double] initial):
 
         cdef long states = mdp.state_count()
         
@@ -1216,7 +1216,7 @@ cdef class MDPIR:
 
         self.thisptr = new MDPI_R((mdp.thisptr)[0], state2obs, initial_t)
 
-    def __init__(self, RoMDP mdp, np.ndarray[double] state2obs, np.ndarray[double] initial):
+    def __init__(self, RoMDP mdp, np.ndarray[long] state2obs, np.ndarray[double] initial):
         self.discount = mdp.discount
 
     def get_robust(self):

@@ -1391,7 +1391,7 @@ class TestImplementable(unittest.TestCase):
 
     def test_construction(self):
         initial = np.ones(2) / 2
-        observations = np.zeros(2)
+        observations = np.zeros(2,dtype=int)
         mdp = crobust.RoMDP(2,0.99)
         mdp.add_transition_d(0,0,1,1.0,1.0);
         mdp.add_transition_d(1,0,0,1.0,1.0);
