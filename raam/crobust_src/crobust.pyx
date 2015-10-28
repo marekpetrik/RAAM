@@ -33,10 +33,30 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         Transition() 
         Transition(const vector[long]& indices, const vector[double]& probabilities, const vector[double]& rewards);
 
-        vector[long] indices
-        vector[double] probabilities
-        vector[double] rewards
-        double prob_sum
+        void set_reward(long sampleid, double reward) except +
+        double get_reward(long sampleid) except +
+
+        const vector[long]& get_indices() 
+        const vector[double]& get_probabilities()
+        const vector[double]& get_rewards() 
+    
+        size_t size() 
+
+    cdef cppclass Action:
+        
+        void set_threshold(double threshold) except +
+        void set_distribution(const vector[double]& distribution) except +
+        void set_distribution(long outcomeid, double weight) except + 
+        
+        Transition& get_transition(long outcomeid) 
+        
+        size_t outcome_count()
+        double get_threshold()
+
+    cdef cppclass State:
+        Action& get_action(long actionid) 
+        size_t action_count() except +
+    
 
     cdef cppclass RMDP:
 
@@ -45,28 +65,14 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         void add_transition(long fromid, long actionid, long outcomeid, 
                             long toid, double probability, double reward) except + 
 
-        void set_distribution(long fromid, long actionid, 
-                                const vector[double] & distribution, 
-                                double threshold) except +
-        void set_uniform_distribution(double threshold);
+        void set_uniform_distribution(double threshold)
         void set_uniform_thresholds(double threshold) except +
 
-        double get_reward(long stateid, long actionid, long outcomeid, long sampleid) except +
-        void set_reward(long stateid, long actionid, long outcomeid, long sampleid, 
-                            double reward) except +
-        long sample_count(long stateid, long actionid, long outcomeid) except +
-
-        double get_threshold(long stateid, long actionid) except +
-        void set_threshold(long stateid, long actionid, double threshold) except +
-
-        double get_toid(long stateid, long actionid, long outcomeid, long sampleid) except +
-        double get_probability(long stateid, long actionid, long outcomeid, long sampleid) except +
+        State& get_state(long stateid) 
 
         void normalize()
 
         long state_count() except +
-        long action_count(long stateid) except +
-        long outcome_count(long stateid, long actionid) except +
         long transitions_count(long stateid, long actionid, long outcomeid) except +
         
         Transition get_transition(long stateid,long actionid,long outcomeid) except +
@@ -95,8 +101,6 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         void transitions_to_csv_file(const string & filename, bool header) except +
         string to_string() except +
 
-        void copy_into(RMDP& target) except + 
-
 
 cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
     
@@ -105,6 +109,8 @@ cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
         MDPI_R(const RMDP& mdp, const vector[long]& observ2state, const Transition& initial);
 
         const RMDP& get_robust_mdp() except +
+
+        vector[long] solve_reweighted(long iterations, double discount);
 
 cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
     """
@@ -232,7 +238,9 @@ cdef class RoMDP:
             raise ValueError('incorrect distribution (does not sum to one)', distribution)
         if np.min(distribution) < 0:
             raise ValueError('incorrect distribution (negative)', distribution)    
-        self.thisptr.set_distribution(fromid,actionid,distribution,threshold)
+
+        self.thisptr.get_state(fromid).get_action(actionid).set_distribution(distribution)
+        self.thisptr.get_state(fromid).get_action(actionid).set_threshold(threshold)
         
     cpdef set_uniform_distributions(self, double threshold):
         """
@@ -726,7 +734,7 @@ cdef class RoMDP:
         stateid : int
             Number of the state
         """
-        return self.thisptr.action_count(stateid)
+        return self.thisptr.get_state(stateid).action_count()
         
     cpdef long outcome_count(self, long stateid, long actionid):
         """
@@ -739,31 +747,31 @@ cdef class RoMDP:
         actionid : int
             Number of the action
         """
-        return self.thisptr.outcome_count(stateid, actionid)
+        return self.thisptr.get_state(stateid).get_action(actionid).outcome_count()
 
     cpdef double get_reward(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the reward for the given state, action, and outcome """
-        return self.thisptr.get_reward(stateid, actionid, outcomeid, sampleid)
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_reward(sampleid)
         
     cpdef double get_toid(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the target state for the given state, action, and outcome """
-        return self.thisptr.get_toid(stateid, actionid, outcomeid, sampleid)
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_indices()[sampleid]
         
     cpdef double get_probability(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the probability for the given state, action, and outcome """
-        return self.thisptr.get_probability(stateid, actionid, outcomeid, sampleid)
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_probabilities()[sampleid]
     
     cpdef set_reward(self, long stateid, long actionid, long outcomeid, long sampleid, double reward):
         """
         Sets the reward for the given state, action, outcome, and sample
         """
-        self.thisptr.set_reward(stateid, actionid, outcomeid, sampleid, reward)
+        self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).set_reward(sampleid, reward)
         
     cpdef long sample_count(self, long stateid, long actionid, long outcomeid):
         """
         Returns the number of samples (single-state transitions) for the action and outcome
         """
-        return self.thisptr.sample_count(stateid, actionid, outcomeid)
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).size()
 
     def list_samples(self):
         """
@@ -779,10 +787,11 @@ cdef class RoMDP:
             for actionid in range(self.action_count(stateid)):
                 for outcomeid in range(self.outcome_count(stateid,actionid)):
                     tran = self.thisptr.get_transition(stateid,actionid,outcomeid)
-                    tcount = len(tran.indices)
+                    tcount = tran.size()
                     for tid in range(tcount):
                         result.append( (stateid,actionid,outcomeid,\
-                            tran.indices[tid], tran.probabilities[tid], tran.rewards[tid]) )
+                            tran.get_indices()[tid], tran.get_probabilities()[tid], \
+                            tran.get_rewards()[tid]) )
 
         return result
 
@@ -791,16 +800,16 @@ cdef class RoMDP:
         Makes a copy of the object
         """
         r = RoMDP(0, self.discount)
-        self.thisptr.copy_into( r.thisptr[0] ) 
+        r.thisptr[0] = self.thisptr[0]
         return r
 
     cpdef double get_threshold(self, long stateid, long actionid):
         """ Returns the robust threshold for a given state """
-        return self.thisptr.get_threshold(stateid, actionid)
+        return self.thisptr.get_state(stateid).get_action(actionid).get_threshold()
     
     cpdef set_threshold(self, long stateid, long actionid, double threshold):
         """ Sets the robust threshold for a given state """
-        self.thisptr.set_threshold(stateid, actionid, threshold)
+        self.thisptr.get_state(stateid).get_action(actionid).set_threshold(threshold)
         
     cpdef transitions_to_csv_file(self, filename, header = True):
         """ Saves the transitions to a csv file """
@@ -1218,6 +1227,17 @@ cdef class MDPIR:
 
     def __init__(self, RoMDP mdp, np.ndarray[long] state2obs, np.ndarray[double] initial):
         self.discount = mdp.discount
+
+    def solve_reweighted(self, long iterations, double discount):
+        """
+        Solves the problem by rewighting the samples according to the current distribution
+        
+        Returns
+        -------
+        out : list
+            List of action indexes for observations
+        """
+        return self.thisptr.solve_reweighted(iterations, discount)
 
     def get_robust(self):
         """

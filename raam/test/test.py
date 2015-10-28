@@ -17,7 +17,6 @@ from raam import robust
 
 settings = {}
 
-
 try:
     from optimadp import opl
     settings['opl'] = True
