@@ -1,8 +1,7 @@
 # distutils: language = c++
-# distutils: libraries = craam
-# distutils: library_dirs = craam/lib
+# distutils: libraries = armadillo craam
+# distutils: library_dirs = craam/lib 
 # distutils: include_dirs = ../../craam/include
-
 
 import numpy as np 
 cimport numpy as np
@@ -98,7 +97,7 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         Solution mpi_jac_l1_rob(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
         Solution mpi_jac_l1_opt(const vector[double] & valuefunction, double discount, unsigned long politerations, double polmaxresidual, unsigned long valiterations, double valmaxresidual) except +
 
-        void transitions_to_csv_file(const string & filename, bool header) except +
+        void to_csv_file(const string & filename, bool header) except +
         string to_string() except +
 
 
@@ -811,9 +810,9 @@ cdef class RoMDP:
         """ Sets the robust threshold for a given state """
         self.thisptr.get_state(stateid).get_action(actionid).set_threshold(threshold)
         
-    cpdef transitions_to_csv_file(self, filename, header = True):
+    cpdef to_csv_file(self, filename, header = True):
         """ Saves the transitions to a csv file """
-        self.thisptr.transitions_to_csv_file(filename, header)
+        self.thisptr.to_csv_file(filename, header)
 
     cpdef string to_string(self):
         cdef string result = self.thisptr.to_string()
@@ -1232,6 +1231,13 @@ cdef class MDPIR:
         """
         Solves the problem by rewighting the samples according to the current distribution
         
+        Parameters
+        ----------
+        iterations : int
+            Number of iterations
+        discount : float
+            Discount factor
+
         Returns
         -------
         out : list

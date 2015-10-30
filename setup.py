@@ -27,13 +27,13 @@ ext_modules = [
     Extension(
         "raam.crobust",
         ["raam/crobust_src/crobust.pyx"],
-        extra_compile_args = ['-std=c++11','-fopenmp','-Ofast','-march=native'],
+        extra_compile_args = ['-std=c++11','-fopenmp','-O2','-march=native'],
         extra_link_args=['-fopenmp'],
         include_dirs = [numpy.get_include(),'craam/include']),
     Extension(
         "raam.examples.fastrandom",
         ["raam/examples/fastrandom.pyx"],
-        extra_compile_args = ['-O3'],
+        extra_compile_args = ['-O2'],
         include_dirs = [numpy.get_include()])]
 
 setup(
