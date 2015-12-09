@@ -470,7 +470,7 @@ class Simulator(metaclass=abc.ABCMeta):
         
         for e in samples.expsamples():
             expstate = e.expStateFrom
-    
+            
             for sample in range(count):
                 profit,decstate = simulator.transition_exp(expstate)
                 new_samples.add_exp(ExpSample(expstate,decstate,\
@@ -505,8 +505,8 @@ class Simulator(metaclass=abc.ABCMeta):
         new_samples = samples.copy(dec=True,exp=append,initial=True)
         
         for d in samples.decsamples():
+            
             expstate = d.expStateTo
-    
             for sample in range(count):
                 profit,decstate = simulator.transition_exp(expstate)
                 new_samples.add_exp(ExpSample(expstate, decstate, profit, 1.0, \
@@ -550,6 +550,7 @@ class Simulator(metaclass=abc.ABCMeta):
             policylist = lambda ds : [policy(ds)]
     
         for d in samples.decsamples():
+
             decstate = d.decStateFrom
             action_original = d.action
     
@@ -599,6 +600,9 @@ class Simulator(metaclass=abc.ABCMeta):
     
         for e in samples.expsamples():
             decstate = e.decStateTo
+    
+            if simulator.end_condition(decstate):
+                continue
     
             actions = policylist(decstate)
             for action in actions:

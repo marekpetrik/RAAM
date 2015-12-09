@@ -17,7 +17,7 @@ config = {
         {'name':'northconway', 'margin':8},
         {'name':'ashford', 'margin':18}],
     'customers' : [
-        {'name':'metropolitan', 'values':[13,13.1,12.9,9,11,9],   'share':1}],
+        {'name':'metropolitan', 'values':[13,13.1,12.9,9,11,9],   'share':1.0}],
     'objective': 'margin',
     'recommendcount': 2
 }
@@ -39,36 +39,6 @@ config2 = {
 }
 
 
-def config_from_matrix(H,init,products,segments,margins,objective='margin'):
-    """
-    Costruct the configuration file from a factorized matrix
-    
-    m - number of segments
-    n - number of products
-    
-    Parameters
-    ----------    
-    H : matrix m x n
-        Segment to product preference matrix
-    init : list (n)
-        Initial segment distribution
-    products : list (n)
-        List of product names
-    segments : list (m)
-        List of segment names
-    margins : list (n)
-        The margin values for each product
-    objective : {'value', 'margin'}
-        The objective, eighter the customer value of the product margin
-    """
-    (m,n) = H.shape
-    assert len(init) == m and len(products) == n and len(segments) == m and len(margins) == n
-    assert np.isclose(np.sum(init), 1) and np.min(init) 
-    
-    products = [{'name' : p, 'margin' : m} for p,m in zip(products,margins)]
-    customers = [{'name' : s, 'values':v, 'share':i} for s,v,i in zip(segments,H,init)]
-    
-    return {'products':products, 'customers':customers,'objective':objective}
 
 def logit(values):
     p = np.exp(values)
@@ -155,19 +125,15 @@ class Recommender(raam.Simulator):
         List of customers
     enstate : decstate
         The state from which customers leave
-    """
-    def __init__(self, config, recsize=1):
-        """
-        Create the object with given configurations
         
-        Parameters
-        ----------
-        config : dict
-            Configuration of the recommendation system that describes the products
-            and the customers
-        recsize : int
-            The number of products recommended
-        """
+    Parameters
+    ----------
+    config : dict
+        Configuration of the recommendation system that describes the products
+        and the customers
+
+    """
+    def __init__(self, config):
         self.config = config
         
         products = config['products']
@@ -202,6 +168,7 @@ class Recommender(raam.Simulator):
         
     def transition_dec(self,decstate,action):
         product, segment = decstate 
+        assert segment < len(self.segmentprobs)
         return (product,segment,action)
         
     def transition_exp(self,expstate):
@@ -242,12 +209,12 @@ class Recommender(raam.Simulator):
         while True:
             customer = choice(self.segmentprobs)
             product = choice(self.prodprobs[customer,:])
+            assert customer < len(self.segmentprobs)
             yield (product,customer)
         
     def actions(self,decstate):
         return self.action_list
-        
-        
+
         
 def addsales(stats):
     stats['sales'] = sum(1 if r > 0.01 else 0 for r in stats['sum_rewards'])
@@ -262,7 +229,7 @@ def unoptimized(simulator,horizon,runs,type):
     horizon : int
     runs : int 
         Number of runs to simulate (results are averaged)
-    type : {"none", "random", "greedy", "liked"}
+    type : {"none", "random", "myopic", "liked"}
         Type of policy to run
     Return
     ------
@@ -274,9 +241,9 @@ def unoptimized(simulator,horizon,runs,type):
     if type == 'none':
         policy = lambda decstate: simulator.actions(decstate)[0]
     elif type == 'random':
-        policy = raam.random_policy(simulator)
+        policy = simulator.random_policy()
     elif type == 'myopic':
-        policy = raam.greedy_policy_q(simulator, lambda x: 0)
+        policy = simulator.greedy_policy_q(lambda x: 0)
     elif type == 'liked':
         def policy(decstate):
             product, segment = decstate
@@ -285,7 +252,7 @@ def unoptimized(simulator,horizon,runs,type):
     else:
         raise ValueError('Invalid type') 
             
-    samples = raam.simulate(simulator,horizon,policy,runs)
+    samples = simulator.simulate(horizon,policy,runs)
     stats = samples.statistics(simulator.discount)
     addsales(stats)
     return samples,stats
@@ -334,7 +301,6 @@ def optimized(simulator,samples,testhorizon,testruns,type,solver='c',norm='none'
     from raam import crobust
 
     iterations = 1000
-
 
     if robmatall is None:    
         if type == 'known':
@@ -413,6 +379,13 @@ def config_from_matrix(W,init,products,segments,margins,objective='margin',recom
         The margin values for each product
     objective : {'value', 'margin'}
         The objective, eighter the customer value of the product margin
+    recommendcount : int
+        Number of recommendations to make
+
+    Returns
+    -------
+    out : dict
+        Configuration file
     """
     (m,n) = W.shape
     assert len(init) == m and len(products) == n and len(segments) == m and len(margins) == n

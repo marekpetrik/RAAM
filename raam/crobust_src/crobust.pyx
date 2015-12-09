@@ -8,7 +8,7 @@ cimport numpy as np
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libcpp.utility cimport pair
-from libcpp.memory cimport shared_ptr
+from libcpp.memory cimport unique_ptr
 from libcpp cimport bool
 import statistics
 from collections import namedtuple 
@@ -16,9 +16,9 @@ from math import sqrt
 import warnings 
 
 cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
-    pair[vector[double],double] worstcase_l1(const vector[double] & z, 
-                                            const vector[double] & q, double t)
-
+    pair[vector[double],double] worstcase_l1(const vector[double] & z, \
+                        const vector[double] & q, double t)
+                                            
     cdef cppclass Solution:
         vector[double] valuefunction
         vector[long] policy
@@ -55,7 +55,6 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
     cdef cppclass State:
         Action& get_action(long actionid) 
         size_t action_count() except +
-    
 
     cdef cppclass RMDP:
 
@@ -109,7 +108,17 @@ cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
 
         const RMDP& get_robust_mdp() except +
 
-        vector[long] solve_reweighted(long iterations, double discount);
+        vector[long] solve_reweighted(long iterations, double discount) except +;
+        
+        
+        void to_csv_file(const string& output_mdp, const string& output_state2obs, \
+                        const string& output_initial, bool headers) except +;
+    
+        unique_ptr[MDPI_R] from_csv_file(const string& input_mdp, \
+                                            const string& input_state2obs, \
+                                            const string& input_initial, \
+                                            bool headers) except +;
+                                            
 
 cpdef cworstcase_l1(np.ndarray[double] z, np.ndarray[double] q, double t):
     """
@@ -1252,3 +1261,12 @@ cdef class MDPIR:
         cdef RoMDP result = RoMDP(0, self.discount)
         result.thisptr[0] = self.thisptr.get_robust_mdp()
         return result
+
+
+    def to_csv(self, mdp_file, state2obs_file, initial_file, headers):
+        """
+        Saves the problem to a csv file
+        """
+        self.thisptr.to_csv_file(mdp_file, state2obs_file, initial_file, headers)
+    
+        
