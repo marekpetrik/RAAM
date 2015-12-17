@@ -23,7 +23,7 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         vector[double] valuefunction
         vector[long] policy
         vector[long] outcomes
-        vector[vector[double]] outcome_dists
+        vector[vector[double]] natpolicy
         double residual
         long iterations
 
@@ -98,6 +98,45 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
 
         void to_csv_file(const string & filename, bool header) except +
         string to_string() except +
+
+
+cdef extern from "../../craam/include/Samples.hpp" namespace 'craam::msen':
+    
+    cdef cppclass DiscreteESample:
+    
+        const long expstate_from;
+        const long decstate_to;
+        const double reward;
+        const double weight;
+        const long step;
+        const long run;
+    
+        DiscreteESample(const long& expstate_from, const long& decstate_to,
+                double reward, double weight, long step, long run);
+    
+    cdef cppclass DiscreteDSample:
+    
+        const long decstate_from;
+        const long action;
+        const long expstate_to;
+        const long step;
+        const long run;
+    
+        DiscreteDSample(const long& decstate_from, const long& action,
+                const long& expstate_to, long step, long run);
+
+    cdef cppclass DiscreteSamples:
+        vector[DiscreteDSample] decsamples;
+        vector[long] initial;
+        vector[DiscreteESample] expsamples;
+    
+        void add_dec(const DiscreteDSample& decsample);
+        void add_initial(const long& decstate);
+        void add_exp(const DiscreteESample& expsample);
+        double mean_return(double discount);
+        
+        DiscreteSamples();
+
 
 
 cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
@@ -370,7 +409,7 @@ cdef class RoMDP:
             Residual for the value function
         iterations : int
             Number of iterations taken
-        outcome_dists : np.ndarray[np.ndarray]
+        natpolicy : np.ndarray[np.ndarray]
             Distributions of outcomes
         """
         
@@ -390,7 +429,7 @@ cdef class RoMDP:
             raise ValueError("Incorrect solution type '%s'."  % stype )
             
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
-                sol.iterations, sol.outcome_dists
+                sol.iterations, sol.natpolicy
         
     cpdef vi_jac(self, int iterations,valuefunction = np.empty(0), \
                                     double maxresidual=0, int stype=0):
@@ -479,7 +518,7 @@ cdef class RoMDP:
             Residual for the value function
         iterations : int
             Number of iterations taken
-        outcome_dists : np.ndarray[np.ndarray]
+        natpolicy : np.ndarray[np.ndarray]
             Distributions of outcomes
         """
         
@@ -498,7 +537,7 @@ cdef class RoMDP:
             raise ValueError("Incorrect solution type '%s'."  % stype )
         
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual, \
-                sol.iterations, sol.outcome_dists
+                sol.iterations, sol.natpolicy
 
     cpdef mpi_jac(self, long iterations, valuefunction = np.empty(0), \
                                     double maxresidual = 0, long valiterations = 1000, int stype=0):
@@ -595,7 +634,7 @@ cdef class RoMDP:
             Residual for the value function
         iterations : int
             Number of iterations taken
-        outcome_dists : np.ndarray[np.ndarray]
+        natpolicy : np.ndarray[np.ndarray]
             Distributions of outcomes
         """
         
@@ -617,7 +656,7 @@ cdef class RoMDP:
             raise ValueError("Incorrect solution type '%s'."  % stype )            
 
         return np.array(sol.valuefunction), np.array(sol.policy), sol.residual,\
-                sol.iterations, sol.outcome_dists
+                sol.iterations, sol.natpolicy
 
     cpdef from_sample_matrices(self, dectoexp, exptodec, actions, rewards):
         """
@@ -1268,5 +1307,87 @@ cdef class MDPIR:
         Saves the problem to a csv file
         """
         self.thisptr.to_csv_file(mdp_file, state2obs_file, initial_file, headers)
+
+from raam import samples
     
+cdef class DiscreteMemSamples:
+    """
+    Wrapper around the C++ representation of samples.
+    """
+    cdef DiscreteSamples *_thisptr
+
+    def __cinit__(self):
+        self._thisptr = new DiscreteSamples() 
+        # fields of the C++ class are:
+        # vector[DiscreteDSample] decsamples;
+        # vector[long] initial;
+        # vector[DiscreteESample] expsamples;
         
+     
+    def __dealloc__(self):
+        del self._thisptr        
+        
+    def __init__(self):
+        """ 
+        Creates empty sample dictionary and returns it.
+        
+        Can take arguments that describe the content of the samples.
+        """
+        pass
+
+    def expsamples(self):
+        """
+        Returns an iterator over expectation samples.
+        """
+        
+        cdef int n = self._thisptr.expsamples.size()
+        
+        return (samples.ExpSample(self._thisptr.expsamples[i].expstate_from, \
+                        self._thisptr.expsamples[i].decstate_to, \
+                        self._thisptr.expsamples[i].reward, \
+                        self._thisptr.expsamples[i].weight, \
+                        self._thisptr.expsamples[i].step, \
+                        self._thisptr.expsamples[i].run) \
+                    for i in range(n))
+    
+    def decsamples(self):
+        """
+        Returns an iterator over decision samples.
+        """
+        
+        cdef int n = self._thisptr.decsamples.size()
+        
+        return (samples.DecSample(self._thisptr.decsamples[i].decstate_from, \
+                        self._thisptr.decsamples[i].action, \
+                        self._thisptr.decsamples[i].expstate_to, \
+                        self._thisptr.decsamples[i].step, \
+                        self._thisptr.decsamples[i].run) \
+                    for i in range(n))
+        
+    def initialsamples(self):
+        """
+        Returns samples of initial decision states.
+        """
+        return (s for s in self.initial)
+
+    def add_exp(self, expsample):
+        """
+        Adds an expectation sample.
+        """
+        
+        self._thisptr.add_exp(DiscreteESample(expsample.expStateFrom, expsample.decStateTo, \
+                        expsample.reward, expsample.weight, expsample.step, expsample.run))
+
+        
+    def add_dec(self, decsample):
+        """
+        Adds a decision sample.
+        """
+        self._thisptr.add_dec(DiscreteDSample(decsample.decStateFrom, decsample.action,\
+                        decsample.expStateTo, decsample.step, decsample.run))
+        
+    def add_initial(self, decstate):
+        """
+        Adds an initial state.
+        """
+        self._thisptr.add_initial(decstate)
