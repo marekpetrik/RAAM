@@ -1,7 +1,8 @@
 import raam
-import raam. examples
-
+import raam.examples
+from raam import features
 from raam.examples import recommender
+from raam import crobust
 
 conf = recommender.config2
 conf['recommendcount'] = 1
@@ -17,8 +18,22 @@ samples = sim.sample_exp_ofdec(samples, 20)
 
 from raam import crobust
 
-s = crobust.DiscreteMemSamples()
+discrete_samples = features.DiscreteSampleView(samples)
 
+dms = crobust.DiscreteMemSamples()
+
+for es in discrete_samples.expsamples():
+    dms.add_exp(es)
+
+for ds in discrete_samples.decsamples():
+    dms.add_dec(ds)
+
+for ins in discrete_samples.initialsamples():
+    dms.add_initial(ins)
+    
+assert len(list(discrete_samples.expsamples())) == len(list(dms.expsamples()))
+assert len(list(discrete_samples.decsamples())) == len(list(dms.decsamples()))
+assert len(list(discrete_samples.initialsamples())) == len(list(dms.initialsamples()))
 
 ## Define sampling that goes between two decision states
 

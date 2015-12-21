@@ -402,7 +402,9 @@ class SampleView(Samples):
         A function that maps actions to their new representation 
     actmapinv : function, optional
         A function that maps the new representation of actions to 
-        the underlying format            
+        the underlying format
+    readonly : bool, false
+        Whether the view is only readonly and it cannot be modified.
 
     Notes
     -----
@@ -414,7 +416,8 @@ class SampleView(Samples):
     def __init__(self,samples,\
                     decmap=identity,decmapinv=identity, \
                     expmap=identity,expmapinv=identity, \
-                    actmap=identity,actmapinv=identity):
+                    actmap=identity,actmapinv=identity, \
+                    readonly=False):
         
         self.samples    = samples
         self.decmap     = decmap
@@ -423,6 +426,7 @@ class SampleView(Samples):
         self.expmapinv  = expmapinv
         self.actmap     = actmap
         self.actmapinv  = actmapinv
+        self._readonly  = readonly
 
     def expsamples(self):
         """
@@ -448,22 +452,31 @@ class SampleView(Samples):
         """
         Adds an expectation sample.
         """
-        s = expsample.map(self.decmapinv,self.expmapinv,self.actmapinv)
-        self.samples.add_exp(s)
+        if not self._readonly:
+            s = expsample.map(self.decmapinv,self.expmapinv,self.actmapinv)
+            self.samples.add_exp(s)
+        else:
+            raise NotImplementedError('Cannot modify readonly view.')
         
     def add_dec(self, decsample):
         """
         Adds a decision sample.
         """
-        s = decsample.map(self.decmapinv,self.expmapinv,self.actmapinv)
-        self.samples.add_dec(s)
+        if not self._readonly:
+            s = decsample.map(self.decmapinv,self.expmapinv,self.actmapinv)
+            self.samples.add_dec(s)
+        else:
+            raise NotImplementedError('Cannot modify readonly view.')
         
     def add_initial(self, decstate):
         """
         Adds an initial state.
         """
-        self.samples.add_initial( \
-                    self.decmapinv(decstate))
+        if not self._readonly:
+            self.samples.add_initial( \
+                        self.decmapinv(decstate))
+        else:
+            raise NotImplementedError('Cannot modify readonly view.')                        
         
     def purge_exp(self):
         """

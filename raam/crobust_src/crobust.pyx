@@ -1368,7 +1368,9 @@ cdef class DiscreteMemSamples:
         """
         Returns samples of initial decision states.
         """
-        return (s for s in self.initial)
+        cdef int n = self._thisptr.initial.size()
+        
+        return (self._thisptr.initial[i] for i in range(n))
 
     def add_exp(self, expsample):
         """

@@ -339,6 +339,7 @@ class IdCache:
         else:
             raise ValueError('Element not present in the cache and add=False.')
 
+
 class IndexCache:
     """
     Creates and caches id's of list objects within each aggregation. Based on
@@ -390,3 +391,35 @@ class IndexCache:
                 raise ValueError('Element not present in the cache and add=False.')
         index = self.index_vals[agg](state,add=add)
         return (agg, index)
+
+
+class DiscreteSampleView(raam.samples.SampleView):
+    """
+    Creates a sample view which assigns discrete numbers to decision states,
+    expectation states, and actions. 
+    
+    State ids are constructed on demand.
+    
+    Arguments
+    ---------
+    decmap : IdCache
+        Maps decision states to indexes
+    expmap : IdCache
+        Maps expectation states to indexes
+    actmap : IdCache
+        Maps actions to indexes
+        
+    Parameters
+    ----------
+    samples : Samples
+        Samples to map state values to indexes
+    """
+    
+    def __init__(self,samples):
+        self.decmap = IdCache()
+        self.expmap = IdCache()
+        self.actmap = IdCache()
+        
+        super().__init__(samples, decmap=self.decmap, expmap=self.expmap, \
+                actmap=self.actmap)
+
