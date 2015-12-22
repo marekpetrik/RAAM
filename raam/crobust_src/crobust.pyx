@@ -8,7 +8,7 @@ cimport numpy as np
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libcpp.utility cimport pair
-from libcpp.memory cimport unique_ptr
+from libcpp.memory cimport unique_ptr, shared_ptr
 from libcpp cimport bool
 import statistics
 from collections import namedtuple 
@@ -34,6 +34,8 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
 
         void set_reward(long sampleid, double reward) except +
         double get_reward(long sampleid) except +
+
+        vector[double] probabilities_vector(unsigned long size) 
 
         const vector[long]& get_indices() 
         const vector[double]& get_probabilities()
@@ -137,6 +139,13 @@ cdef extern from "../../craam/include/Samples.hpp" namespace 'craam::msen':
         
         DiscreteSamples();
 
+    cdef cppclass SampledMDP:
+        
+        SampledMDP()
+    
+        void copy_samples(const DiscreteSamples& samples) except +
+        shared_ptr[const RMDP] get_mdp() except +
+        Transition get_initial() except +
 
 
 cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
@@ -1393,3 +1402,50 @@ cdef class DiscreteMemSamples:
         Adds an initial state.
         """
         self._thisptr.add_initial(decstate)
+        
+    def copy_from(self,samples):
+        """
+        Copies samples, which must be discrete.
+        
+        Parameters
+        ----------
+        samples : Samples
+            Source of samples
+        """
+        
+        for es in samples.expsamples():
+            self.add_exp(es)
+        
+        for ds in samples.decsamples():
+            self.add_dec(ds)
+        
+        for ins in samples.initialsamples():
+            self.add_initial(ins)
+
+cdef class SMDP:
+    """
+    An MDP that can be constructed from samples
+    """
+    
+    cdef SampledMDP *_thisptr
+        
+    def __cinit__(self):
+        self._thisptr = new SampledMDP()
+    
+    def __dealloc__(self):
+        del self._thisptr    
+        
+    def copy_samples(self, DiscreteMemSamples samples):
+        self._thisptr.copy_samples((samples._thisptr)[0])
+    
+    def get_mdp(self, discount):
+        """ Returns constructed MDP """
+        m = RoMDP(0,discount)
+        m.thisptr[0] = (self._thisptr.get_mdp().get())[0]
+        return m
+        
+    def get_initial(self):
+        """ Returns constructed initial distribution """
+        cdef Transition t = self._thisptr.get_initial()
+        return np.array(t.probabilities_vector(self._thisptr.get_mdp().get().state_count()))
+        

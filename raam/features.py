@@ -10,6 +10,7 @@ import numpy as np
 import math
 import copy
 import raam.samples
+from operator import itemgetter
 
 
 def apply_dec(samples,features):
@@ -300,7 +301,7 @@ class IdCache:
     calling the class instance/object as a function (or use the method __call__). 
     This class can be used to generate id's online for a set of values.
     
-    The list of converted to a tuple.
+    The list is converted to a tuple.
     
     Example
     -------
@@ -400,6 +401,9 @@ class DiscreteSampleView(raam.samples.SampleView):
     
     State ids are constructed on demand.
     
+    This class can be also used to reduce the number of states if they are
+    not generated contigously, such as when they come from GridAggregation
+    
     Arguments
     ---------
     decmap : IdCache
@@ -413,13 +417,47 @@ class DiscreteSampleView(raam.samples.SampleView):
     ----------
     samples : Samples
         Samples to map state values to indexes
+    decmapinit : list 
+        List of values to be assigned ids beginning with 0 to init decision state numbers
+    expmapinit : list 
+        List of values to be assigned ids beginning with 0 to init expectation state numbers
+    actmapinit : list 
+        List of values to be assigned ids beginning with 0 to init action numbers
     """
     
-    def __init__(self,samples):
+    def __init__(self,samples,decmapinit=[],expmapinit=[],actmapinit=[]):
         self.decmap = IdCache()
+        for v in decmapinit:
+            self.decmap(v)
+        
         self.expmap = IdCache()
+        for v in expmapinit:
+            self.expmap(v)        
+        
         self.actmap = IdCache()
+        for v in actmapinit:
+            self.actmap(v)        
         
         super().__init__(samples, decmap=self.decmap, expmap=self.expmap, \
                 actmap=self.actmap)
 
+    def all_decstates(self):
+        """
+        Returns a sorted list of all decision states
+        """
+        return list(map(itemgetter(0), \
+                    sorted(self.decmap.state_vals.items(),key=itemgetter(1))))
+                    
+    def all_expstates(self):
+        """
+        Returns a sorted list of all expectation states
+        """
+        return list(map(itemgetter(0), \
+                    sorted(self.expmap.state_vals.items(),key=itemgetter(1))))
+                    
+    def all_actions(self):
+        """
+        Returns a sorted list of all decision states
+        """
+        return list(map(itemgetter(0), \
+                    sorted(self.actmap.state_vals.items(),key=itemgetter(1))))
