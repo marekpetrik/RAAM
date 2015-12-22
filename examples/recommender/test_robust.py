@@ -10,10 +10,10 @@ conf['recommendcount'] = 1
 
 sim = recommender.Recommender(conf)
 
-samples, stats = recommender.unoptimized(sim, 50, 300, 'random')
+samples, stats = recommender.unoptimized(sim, 100, 500, 'random')
 
 samples = sim.sample_dec_ofexp(samples)
-samples = sim.sample_exp_ofdec(samples, 20)
+samples = sim.sample_exp_ofdec(samples, 40)
 
 ## Create C++ Samples
 
@@ -27,7 +27,6 @@ dms.copy_from(discrete_samples)
 assert len(list(discrete_samples.expsamples())) == len(list(dms.expsamples()))
 assert len(list(discrete_samples.decsamples())) == len(list(dms.decsamples()))
 assert len(list(discrete_samples.initialsamples())) == len(list(dms.initialsamples()))
-
 
 ## Construct the sampled MDP
 
@@ -43,8 +42,7 @@ p0 = smdp.get_initial()
 
 from raam import crobust
 
-sol = mdp.mpi_jac(100)
-
+sol = mdp.mpi_jac(1000)
 v = sol[0]
 pol = sol[1]
 
@@ -60,6 +58,8 @@ from operator import itemgetter
 observations = np.array([s[0] for s in discrete_samples.all_decstates()],dtype=np.long)
 
 mdpi = crobust.MDPIR(mdp,observations,p0)
-mdpi.to_csv(b"mdp.csv",b"observ.csv",b"initial.csv",True)
+#mdpi.to_csv(b"mdp.csv",b"observ.csv",b"initial.csv",True)
 
-#sol = mdpi.solve_reweighted(10,0.99)
+sol = mdpi.solve_reweighted(3,0.99)
+
+print(sol)
