@@ -1,5 +1,5 @@
 # distutils: language = c++
-# distutils: libraries = armadillo craam
+# distutils: libraries = craam
 # distutils: library_dirs = craam/lib 
 # distutils: include_dirs = ../../craam/include
 
