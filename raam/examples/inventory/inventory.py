@@ -129,7 +129,7 @@ class Simulator(raam.Simulator):
         Parameters
         ----------
         decstate : decision state
-            inventory,capacity,pricebuy,pricesell 
+            inventory,capacity,priceindex
         action : float
             change in charge (this is a float value, not the index)
 
@@ -183,7 +183,6 @@ class Simulator(raam.Simulator):
         pricecount = len(self.price_probabilities[priceindex,:])
 
         # this is very slow. It would be better to use the cython code from examples 
-        # for this
         priceindex = np.random.choice(\
             np.arange(pricecount,dtype=int), \
             p=self.price_probabilities[priceindex,:])
@@ -211,6 +210,10 @@ class Simulator(raam.Simulator):
 
     def initstates(self):
         return self.stateiterator()
+
+    def price_levels(self):
+        """ Returns the number of price states in the Markov model """
+        return self.price_probabilities.shape[0]
 
 class Features:
     """ 

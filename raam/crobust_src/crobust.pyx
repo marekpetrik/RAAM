@@ -896,7 +896,7 @@ class SRoMDP:
     discount : float
         Discount factor used in the MDP.
     """
-    
+
     def __init__(self,states,discount):
         # state mappings
         self.rmdp = RoMDP(states,sqrt(discount))
@@ -915,20 +915,27 @@ class SRoMDP:
         # expectation states
         self.ecount_sao = {} # maps state,action,outcome to the number of observations
             # this is uses to combine multiple samples
+
+        # initial distribution; maps states to probabilities
+        self.initial_distribution = {}
     
     def from_samples(self, samples, decagg_big, decagg_small, \
                         expagg_big, expagg_small, actagg):
         """
         Loads data to the MDP from the provided samples given aggregation functions.
         Each decision state that belongs to a single aggregated state corresponds 
-        to an (wost-case) outcome. The function does not return anything.
+        to an (worst-case) outcome. The function does not return anything.
         
         Both expectation and decision states are translated to separate RMDP states
         
         Important: the discount factor used internally with the RoMDP must 
         be sqrt(discount) for to behave as discount; this correction is handled 
         automatically by the class.
+
+        The method also estimates the initial distribution from the samples
         
+        This method can only be called once for an object
+
         Parameters
         ----------
         samples : raam.Samples
@@ -1102,7 +1109,29 @@ class SRoMDP:
         
         # normalize transition weights
         self.rmdp.normalize()
-                
+
+        # process initial distribution
+        for dstate in samples.initialsamples():
+            # compute the mdp state for the decision state
+            aggds_big = decagg_big(dstate)
+            if aggds_big in decstate2state:
+                numdecstate = decstate2state[aggds_big]
+            else:
+                numdecstate = mdpstates
+                mdpstates += 1
+                decstate2state[aggds_big] = numdecstate
+            
+            if numdecstate in self.initial_distribution:
+                self.initial_distribution[numdecstate] += 1
+            else:
+                self.initial_distribution[numdecstate] = 1
+
+        # normalize initial distribution
+        samplecount = sum(self.initial_distribution.values())
+        for k,v in self.initial_distribution.items():
+            self.initial_distribution[k] = v/samplecount
+
+
     def decvalue(self,states,value,minstate=0):
         """
         Corrects the value function and maps the result from an algorithm
@@ -1118,9 +1147,9 @@ class SRoMDP:
             must be numbered from 0 to states - 1
         value : numpy.array
             Value function array as an output from the optimization methods. This
-            uses an internal representation.
+            uses the internal state representation.
         minstate : int, optional
-            The minimal index of the state. The default is 0.
+            The minimal index of a state to output. The default is 0.
         
         Returns
         -------
@@ -1150,7 +1179,7 @@ class SRoMDP:
             must be numbered from 0 to states - 1
         value : numpy.array
             Value function array as an output from the optimization methods. This
-            uses an internal representation.
+            uses the state internal representation.
         minstate : int, optional
             The minimal index of the state. The default is 0.
         
@@ -1243,6 +1272,22 @@ class SRoMDP:
         """
         
         return list( zip(*self.statemaps.decstate2state.items()) )
+
+    def valreturn(self, value):
+        """
+        Uses the internally store initial distribution to compute the
+        return for the value function
+
+        Parameters
+        ----------
+        value : numpy.array
+            Value function array as an output from the optimization methods. This
+            uses the internal state representation.
+        """
+        result = 0.0
+        for ds,p in self.initial_distribution.items():
+            result += value[ds] * p
+        return result
 
 
 cdef class MDPIR:
