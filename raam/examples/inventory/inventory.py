@@ -77,7 +77,7 @@ class Simulator(raam.Simulator):
         - reward
     
     Action: charge change
-        This is not an index but an absolute value of the charge change
+        This is not an index but an absolute value of the change in charge
 
     Parameters
     ----------
@@ -182,7 +182,7 @@ class Simulator(raam.Simulator):
 
         pricecount = len(self.price_probabilities[priceindex,:])
 
-        # this is very slow. It would be better to use the cython code from examples 
+        # TODO: this is very slow. It would be better to use the cython code from examples 
         # for this
         priceindex = np.random.choice(\
             np.arange(pricecount,dtype=int), \
@@ -212,6 +212,12 @@ class Simulator(raam.Simulator):
     def initstates(self):
         return self.stateiterator()
 
+    def price_levels(self):
+        """
+        Number of discrete price levels considered by the simulator
+        """
+        return self.price_probabilities.shape[0]
+
 class Features:
     """ 
     Suitable features for inventory management 
@@ -219,7 +225,6 @@ class Features:
     linear = (features.piecewise_linear(None), features.piecewise_linear(None))
 
 ## Threshold policy definitions
-
 def threshold_policy(lowers, uppers, simulator):
     """
     Construct a threshold policy with different thresholds for different price 
@@ -420,12 +425,13 @@ def makesimulator(discretization,discount,action_step=0.1):
     construction of the sampled MDP. The prices are constructed using the 
     martingale price evolution.
     
-    The inventory level is discretized according to the provided parameter.
+    The inventory level is discretized according to the provided parameter, but 
+    the discretization happens after simulation just for the samples.
 
     Parameters
     ----------
     discretization : int
-        Number of steps to discretize the inventory values to
+        Number of discrete inventory levels 
     
     Returns
     -------
@@ -443,7 +449,7 @@ def makesimulator(discretization,discount,action_step=0.1):
     
     # problem configuration
     config = raam.examples.inventory.configuration.construct_martingale(np.arange(5), 5)
-    config['change_capacity'] = True
+    config['change_capacity'] = True        # updates capacity of inventory (degradation)
     sim = raam.examples.inventory.Simulator(config,action_step=action_step,discount=discount)
     
     # construct the set of possible actions and map them to indexes
@@ -458,7 +464,6 @@ def makesimulator(discretization,discount,action_step=0.1):
         soc,capacity,priceindex,reward = s
         return (soc,capacity,reward)
     
-        
     #** for narrow samples
     # decision state: soc, priceindex
     decagg_big = raam.features.GridAggregation( \
@@ -474,17 +479,19 @@ def makesimulator(discretization,discount,action_step=0.1):
     dab = lambda x: decagg_big.classify(x,True)     
     # assign an index to an expectation state
     ea = lambda x: expagg.classify(x,True)
-    # used to represent the worst case for decision states, not used here
+    # represents the individual states (e.g. for computing worst case or best case solutions)
     das = lambda x: 0
-    # used to represent the worst case for decision states
+    # represents individual expectation states
+    eas = lambda x: 0
+    # aggregations of actions
     aa = lambda x : np.argmin(np.abs(all_actions - x))
 
-    # a helper function that constructs SRMDP from the samples
+    # a helper function that constructs SRMDP from the provided samples
     def create_srmdp(samples):
-        narrow_samples = raam.samples.SampleView(samples, decmap = decmap,
-                    expmap = expmap, actmap=raam.identity)
+        narrow_samples = raam.samples.SampleView(samples,decmap=decmap,
+                    expmap=expmap, actmap=raam.identity)
         srmdp = crobust.SRoMDP(0,sim.discount)
-        srmdp.from_samples(narrow_samples,decagg_big=dab,decagg_small=das,expagg=ea,actagg=aa)
+        srmdp.from_samples(narrow_samples,dab,das,ea,eas,aa)
         return srmdp
         
     def create_policy(srmdp, policy_vec):
