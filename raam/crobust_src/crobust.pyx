@@ -162,10 +162,13 @@ cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
 
         vector[long] solve_reweighted(long iterations, double discount) except +;
         
+        double total_return(const vector[long]& obspol, double discount, double precision);
         
         void to_csv_file(const string& output_mdp, const string& output_state2obs, \
                         const string& output_initial, bool headers) except +;
     
+        long state_count();
+
         unique_ptr[MDPI_R] from_csv_file(const string& input_mdp, \
                                             const string& input_state2obs, \
                                             const string& input_initial, \
@@ -1338,6 +1341,15 @@ cdef class MDPIR:
         Converts an observation policy to a state policy
         """
         return self.thisptr.obspol2statepol(obspol);
+
+    def state_count(self):
+        """ Number of states in the MDP """
+        return self.thisptr.state_count()
+
+    def total_return(self, np.ndarray[long] obspol):
+        """ """
+        assert len(obspol) == self.state_count()
+        return self.thisptr.total_return(obspol, self.discount, 1e-8)
 
     def to_csv(self, mdp_file, state2obs_file, initial_file, headers):
         """
