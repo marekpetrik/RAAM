@@ -167,7 +167,8 @@ cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
         void to_csv_file(const string& output_mdp, const string& output_state2obs, \
                         const string& output_initial, bool headers) except +;
     
-        long state_count();
+        long state_count(); 
+        long obs_count();
 
         unique_ptr[MDPI_R] from_csv_file(const string& input_mdp, \
                                             const string& input_state2obs, \
@@ -1346,9 +1347,13 @@ cdef class MDPIR:
         """ Number of states in the MDP """
         return self.thisptr.state_count()
 
+    def obs_count(self):
+        """ Number of observations in the interpretable MDP """
+        return self.thisptr.obs_count()
+
     def total_return(self, np.ndarray[long] obspol):
         """ """
-        assert len(obspol) == self.state_count()
+        assert len(obspol) == self.obs_count()
         return self.thisptr.total_return(obspol, self.discount, 1e-8)
 
     def to_csv(self, mdp_file, state2obs_file, initial_file, headers):
