@@ -38,8 +38,6 @@ config2 = {
     'recommendcount': 2
 }
 
-
-
 def logit(values):
     p = np.exp(values)
     p = p / p.sum()
@@ -52,7 +50,9 @@ def initial_probabilities(values):
     return logit(values / 100)
 
 def purchase_probability(value):
-    """ Returns the probability that the customer purchases the item of the given value """
+    """ 
+    Returns the probability that the customer purchases the item of the given value 
+    """
     # the value 13 is arbitrary and should be fir to data
     a = exp(13) 
     b = exp(value)
@@ -69,7 +69,7 @@ def recommendation_probabilities(currentvalue,values):
     values : array
         Values of the recommended items
     """
-    # the value 3 is arbitrary and should be fir to data
+    # TODO: the value 3 is arbitrary and should be fit to data
     a = exp(3)
     b = exp(currentvalue)
     v = np.exp(values)
@@ -77,6 +77,9 @@ def recommendation_probabilities(currentvalue,values):
     return v / (a + b + np.sum(v))
     
 def leave_probability(value):
+    """
+    Probability of a customer leaving
+    """
     a = exp(10)
     b = exp(value)
     return min(0.1,a/(a+b))
@@ -167,11 +170,13 @@ class Recommender(raam.Simulator):
         return 1.0
         
     def transition_dec(self,decstate,action):
+        """ Computes a deterministic transition """
         product, segment = decstate 
         assert segment < len(self.segmentprobs)
         return (product,segment,action)
         
     def transition_exp(self,expstate):
+        """ Computes a transition """
         product, segment, action = expstate
         
         currvalue = self.preferences[segment,product]
@@ -215,7 +220,6 @@ class Recommender(raam.Simulator):
     def actions(self,decstate):
         return self.action_list
 
-        
 def addsales(stats):
     stats['sales'] = sum(1 if r > 0.01 else 0 for r in stats['sum_rewards'])
 
@@ -370,7 +374,7 @@ def config_from_matrix(W,init,products,segments,margins,objective='margin',recom
     W : matrix m x n
         Segment to product preference matrix
     init : list (n)
-        Initial segment distribution
+        Distribution of segments
     products : list (n)
         List of product names
     segments : list (m)
@@ -378,7 +382,7 @@ def config_from_matrix(W,init,products,segments,margins,objective='margin',recom
     margins : list (n)
         The margin values for each product
     objective : {'value', 'margin'}
-        The objective, eighter the customer value of the product margin
+        The objective, either the customer value of the product margin
     recommendcount : int
         Number of recommendations to make
 

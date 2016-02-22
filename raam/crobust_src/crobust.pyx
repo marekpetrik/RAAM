@@ -143,7 +143,7 @@ cdef extern from "../../craam/include/Samples.hpp" namespace 'craam::msen':
         
         SampledMDP()
     
-        void copy_samples(const DiscreteSamples& samples) except +
+        void add_samples(const DiscreteSamples& samples) except +
         shared_ptr[const RMDP] get_mdp() except +
         Transition get_initial() except +
 
@@ -1481,7 +1481,7 @@ cdef class SMDP:
         del self._thisptr    
         
     def copy_samples(self, DiscreteMemSamples samples):
-        self._thisptr.copy_samples((samples._thisptr)[0])
+        self._thisptr.add_samples((samples._thisptr)[0])
     
     def get_mdp(self, discount):
         """ Returns constructed MDP """
