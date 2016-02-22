@@ -1,5 +1,5 @@
 # distutils: language = c++
-# distutils: libraries = armadillo craam
+# distutils: libraries = craam
 # distutils: library_dirs = craam/lib 
 # distutils: include_dirs = ../../craam/include
 
@@ -53,6 +53,8 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
         
         size_t outcome_count()
         double get_threshold()
+
+        Transition& get_outcome(long outcomeid) except +
 
     cdef cppclass State:
         Action& get_action(long actionid) 
@@ -154,14 +156,20 @@ cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
     
         MDPI_R(const RMDP& mdp, const vector[long]& observ2state, const Transition& initial);
 
+        vector[long] obspol2statepol(const vector[long]& obspol) except +;
+        
         const RMDP& get_robust_mdp() except +
 
         vector[long] solve_reweighted(long iterations, double discount) except +;
         
+        double total_return(const vector[long]& obspol, double discount, double precision);
         
         void to_csv_file(const string& output_mdp, const string& output_state2obs, \
                         const string& output_initial, bool headers) except +;
     
+        long state_count(); 
+        long obs_count();
+
         unique_ptr[MDPI_R] from_csv_file(const string& input_mdp, \
                                             const string& input_state2obs, \
                                             const string& input_initial, \
@@ -805,11 +813,26 @@ cdef class RoMDP:
         """
         return self.thisptr.get_state(stateid).get_action(actionid).outcome_count()
 
+    cpdef long transition_count(self, long stateid, long actionid, long outcomeid):
+        """
+        Number of transitions (sparse transition probability) following a state,
+        action, and outcome
+
+        Parameters
+        ----------
+        stateid : int
+            Number of the state
+        actionid : int
+            Number of the action
+        """
+        return self.thisptr.get_state(stateid).get_action(actionid).get_outcome(outcomeid).size()
+
+
     cpdef double get_reward(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the reward for the given state, action, and outcome """
         return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_reward(sampleid)
         
-    cpdef double get_toid(self, long stateid, long actionid, long outcomeid, long sampleid):
+    cpdef long get_toid(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the target state for the given state, action, and outcome """
         return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_indices()[sampleid]
         
@@ -888,6 +911,10 @@ class SRoMDP:
     
     See :method:`from_samples` for the description of basic usage.
     
+    Important: the discount factor used internally with the RoMDP must 
+    be sqrt(discount) for to behave as discount; this correction is handled 
+    automatically by the class.
+
     Parameters
     ----------
     states : int
@@ -922,7 +949,7 @@ class SRoMDP:
     def from_samples(self, samples, decagg_big, decagg_small, \
                         expagg_big, expagg_small, actagg):
         """
-        Loads data to the MDP from the provided samples given aggregation functions.
+        Loads samples to the MDP from the provided samples given aggregation functions.
         Each decision state that belongs to a single aggregated state corresponds 
         to an (worst-case) outcome. The function does not return anything.
         
@@ -1331,7 +1358,7 @@ cdef class MDPIR:
 
     def solve_reweighted(self, long iterations, double discount):
         """
-        Solves the problem by rewighting the samples according to the current distribution
+        Solves the problem by reweighting the samples according to the current distribution
         
         Parameters
         ----------
@@ -1355,6 +1382,24 @@ cdef class MDPIR:
         result.thisptr[0] = self.thisptr.get_robust_mdp()
         return result
 
+    def obspol2statepol(self, np.ndarray[long] obspol):
+        """
+        Converts an observation policy to a state policy
+        """
+        return self.thisptr.obspol2statepol(obspol);
+
+    def state_count(self):
+        """ Number of states in the MDP """
+        return self.thisptr.state_count()
+
+    def obs_count(self):
+        """ Number of observations in the interpretable MDP """
+        return self.thisptr.obs_count()
+
+    def total_return(self, np.ndarray[long] obspol):
+        """ """
+        assert len(obspol) == self.obs_count()
+        return self.thisptr.total_return(obspol, self.discount, 1e-8)
 
     def to_csv(self, mdp_file, state2obs_file, initial_file, headers):
         """
@@ -1366,7 +1411,13 @@ from raam import samples
     
 cdef class DiscreteMemSamples:
     """
-    Wrapper around the C++ representation of samples.
+    Represent samples in which decision and expectation states, actions, 
+    are described by integers. It is a wrapper around the C++ representation of samples.
+
+    Each state, action, and expectation state must have an integral value.
+
+    Class ``features.DiscreteSampleView`` can be used as a convenient method for assigning
+    state identifiers based on the equality between states.
     """
     cdef DiscreteSamples *_thisptr
 
@@ -1384,7 +1435,6 @@ cdef class DiscreteMemSamples:
     def __init__(self):
         """ 
         Creates empty sample dictionary and returns it.
-        
         Can take arguments that describe the content of the samples.
         """
         pass
@@ -1470,6 +1520,13 @@ cdef class DiscreteMemSamples:
 cdef class SMDP:
     """
     An MDP that can be constructed from samples
+
+    The class is based on DiscreteMemSamples, which
+    assign an integer to each state, and action
+
+    Unlike SRoMDP, this class does not treat expectation states as separate states.
+    The representation is simpler, but also this means that the computational 
+    complexity may be much greater because of repeated transition probabilities.
     """
     
     cdef SampledMDP *_thisptr
@@ -1481,6 +1538,11 @@ cdef class SMDP:
         del self._thisptr    
         
     def copy_samples(self, DiscreteMemSamples samples):
+        """
+        Adds samples to the MDP representation.
+
+        At the moment, this method can only be called once.
+        """
         self._thisptr.add_samples((samples._thisptr)[0])
     
     def get_mdp(self, discount):

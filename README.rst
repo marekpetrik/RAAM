@@ -35,21 +35,34 @@ Requirements:
 - Setuptools 7.0
 - Numpy 1.8+
 - Scipy 0.13 
-- Cython 0.21+ and GCC 4.9+ or LLVM or another compiler with C++11 support
+- Cython 0.21+ and GCC 4.9+ or LLVM or another compiler with C++14 support
+- Boost
+- CMake 3.1.0+
+- C++14 compatible 
 
-The package has been tested only on Linux, but should also work on Windows and Mac.
+The package has been tested only on Linux.
 
 Optional dependencies:
 
 - Matplotlib 1.0+ for plotting support
 
-The source code (including the C++ sub-repository) can be downloaded as:
+The source code (including the C++ sub-repository) can be checkout out recursively as:
 
 .. code:: bash
 
     git clone https://marekpetrik@bitbucket.org/marekpetrik/raam.git --recursive
 
-To install, simply execute:
+First, compile the C++ code
+ 
+.. code:: bash
+
+    $ cd craam
+    $ cmake .
+    $ cmake --build . --target craam
+    $ cmake --build . --target testit
+    $ cd ..
+
+To install, simply execute (use ``--user`` to install locally):
 
 .. code:: bash
 

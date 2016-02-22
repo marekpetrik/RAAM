@@ -14,8 +14,8 @@ runs = 1000                     # maximal number of runs
 sample_count = 10000            # total maximal number of samples for constructing models
 eval_sample_count = 10000       # total maximal number of samples for constructing models
 
-discretization = 3
-discount = 0.8      
+discretization = 3              # discretization for inventory levels
+discount = 0.8                  # discount factor
 
 extra_exp_samples = 5           # number of additional expectation transitions sampled
 

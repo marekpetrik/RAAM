@@ -19,6 +19,7 @@ samples = sim.sample_exp_ofdec(samples, 40)
 
 from raam import crobust
 
+# Construct discrete samples
 discrete_samples = features.DiscreteSampleView(samples,actmapinit=sim.action_list)
 
 dms = crobust.DiscreteMemSamples()
@@ -29,14 +30,12 @@ assert len(list(discrete_samples.decsamples())) == len(list(dms.decsamples()))
 assert len(list(discrete_samples.initialsamples())) == len(list(dms.initialsamples()))
 
 ## Construct the sampled MDP
-
 smdp = crobust.SMDP()
 
 smdp.copy_samples(dms)
 
 mdp = smdp.get_mdp(0.9)
 p0 = smdp.get_initial()
-
 
 ## Construct and solve an MDP version
 
