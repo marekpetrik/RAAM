@@ -37,9 +37,9 @@ cdef extern from "../../craam/include/RMDP.hpp" namespace 'craam':
 
         vector[double] probabilities_vector(unsigned long size) 
 
-        const vector[long]& get_indices() 
-        const vector[double]& get_probabilities()
-        const vector[double]& get_rewards() 
+        vector[long]& get_indices() 
+        vector[double]& get_probabilities()
+        vector[double]& get_rewards() 
     
         size_t size() 
 
@@ -832,14 +832,26 @@ cdef class RoMDP:
         """ Returns the reward for the given state, action, and outcome """
         return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_reward(sampleid)
         
+    cpdef get_rewards(self, long stateid, long actionid, long outcomeid):
+        """ Returns the reward for the given state, action, and outcome """
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_rewards()
+
     cpdef long get_toid(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the target state for the given state, action, and outcome """
         return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_indices()[sampleid]
         
+    cpdef get_toids(self, long stateid, long actionid, long outcomeid):
+        """ Returns the target state for the given state, action, and outcome """
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_indices()
+
     cpdef double get_probability(self, long stateid, long actionid, long outcomeid, long sampleid):
         """ Returns the probability for the given state, action, and outcome """
         return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_probabilities()[sampleid]
     
+    cpdef get_probabilities(self, long stateid, long actionid, long outcomeid):
+        """ Returns the probability for the given state, action, and outcome """
+        return self.thisptr.get_state(stateid).get_action(actionid).get_transition(outcomeid).get_probabilities()
+
     cpdef set_reward(self, long stateid, long actionid, long outcomeid, long sampleid, double reward):
         """
         Sets the reward for the given state, action, outcome, and sample
