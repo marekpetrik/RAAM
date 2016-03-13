@@ -161,6 +161,7 @@ cdef extern from "../../craam/include/ImMDP.hpp" namespace 'craam::impl':
         const RMDP& get_robust_mdp() except +
 
         vector[long] solve_reweighted(long iterations, double discount) except +;
+        vector[long] solve_robust(long iterations, double threshold, double discount) except +;
         
         double total_return(const vector[long]& obspol, double discount, double precision);
         
@@ -1368,6 +1369,9 @@ cdef class MDPIR:
     def __init__(self, RoMDP mdp, np.ndarray[long] state2obs, np.ndarray[double] initial):
         self.discount = mdp.discount
 
+    def __dealloc__(self):
+        del self.thisptr
+
     def solve_reweighted(self, long iterations, double discount):
         """
         Solves the problem by reweighting the samples according to the current distribution
@@ -1385,6 +1389,29 @@ cdef class MDPIR:
             List of action indexes for observations
         """
         return self.thisptr.solve_reweighted(iterations, discount)
+
+    def solve_robust(self, long iterations, double threshold, double discount):
+        """
+        Solves the problem by reweighting the samples according to the current distribution
+        and computing a robust solution. The robustness is in terms of L1 norm and 
+        determined by the threshold.
+        
+        Parameters
+        ----------
+        iterations : int
+            Number of iterations
+        threshold : double
+            Bound on the L1 deviation probability
+        discount : float
+            Discount factor
+
+        Returns
+        -------
+        out : list
+            List of action indexes for observations
+        """
+        return self.thisptr.solve_robust(iterations, threshold, discount)
+
 
     def get_robust(self):
         """
