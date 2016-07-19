@@ -11,7 +11,7 @@ def degradation(fun,charge,discharge):
     """
     Constructs a capacity degradation function from given parameters.
     
-    The functions are D- and D+: the antiderivatives. See the paper for more details
+    The functions are D- and D+: the anti-derivatives. See the paper for more details
     
     Parameters
     ----------
@@ -182,8 +182,6 @@ class Simulator(raam.Simulator):
 
         pricecount = len(self.price_probabilities[priceindex,:])
 
-        # TODO: this is very slow. It would be better to use the cython code from examples 
-        # for this
         priceindex = np.random.choice(\
             np.arange(pricecount,dtype=int), \
             p=self.price_probabilities[priceindex,:])

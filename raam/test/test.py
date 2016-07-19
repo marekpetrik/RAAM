@@ -13,7 +13,6 @@ import json
 
 from raam import features
 from raam import crobust
-from raam import robust
 
 settings = {}
 
@@ -130,52 +129,6 @@ class TestHolisticAlgorithmRuns(unittest.TestCase):
                 continue
             self.assertAlmostEqual(mr, desired[a][0],3)
             self.assertAlmostEqual(obj, desired[a][1],3)
-
-class TestSampleView(unittest.TestCase):
-    """ Test the SampleView implementation """
-
-    def test_samples_view(self):
-        np.random.seed(0)
-        random.seed(0)
-        import copy
-        horizon = 200 
-        runs = 500
-        config = copy.copy(raam.examples.recommender.config2)
-        config['recommendcount'] = 1
-        config['objective'] = 'margin'
-        simulator = raam.examples.recommender.Recommender(config)
-    
-        policy_random = simulator.random_policy()
-        samples_original = raam.samples.MemSamples()
-        
-        def toj(o):
-            return json.dumps(o)
-        def ofj(o):
-            a = json.loads(o)
-            if type(a) == list and len(a) >= 3 and type(a[2]) == list:
-                a[2] = tuple(a[2])
-            return a if type(a) != list else tuple(a) 
-        
-        samples_random = raam.samples.SampleView(samples_original,\
-            decmap=ofj,decmapinv=toj,expmap=ofj,expmapinv=toj,\
-            actmap=ofj,actmapinv=toj)
-        
-        simulator.simulate(horizon,policy_random,runs,samples=samples_random)
-        
-        decagg = robust.__ind__
-        expagg = features.IdCache()
-        self.result = robust.matrices(samples_random,decagg=decagg,expagg=expagg)
-        result = self.result
-        
-        self.statecount = self.result['dectoexp'].shape[0]
-        
-        self.rmdp = crobust.RoMDP(self.statecount, 1)
-        self.rmdp.from_sample_matrices(result['dectoexp'], result['exptodec'], result['actions'], result['rewards'])
-        
-        self.v_robust = [ 5.20241692,  3.48411739,  6.29607251,  6.29607251, 3.7897281, 6.94864048, 0.        ]
-        self.v_robust_half = [  7.86077137,   9.05926647,   9.43518508,  12.21934149,  5.98868032,  13.08652546,   0.        ]
-
-        # TODO: the actual test is missing here move this code to robust recommender
 
 class BasicTestsSimulation(unittest.TestCase):
     """ Simulation tests """
@@ -617,16 +570,6 @@ class TestPrecise(unittest.TestCase):
         for a,b in zip(des, solution['DecStateCx']):
             self.assertAlmostEqual(a,b,3)
             
-    def test_robust_stoch(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samplesstoch,decagg=decagg,expagg=expagg)
-        values, policy, residual = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],0.9,200)
-    
-        des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
-        for a,b in zip(des, values):
-            self.assertAlmostEqual(a,b,3)
-         
     def test_crobust_stoch(self):
         decagg = features.IndexCache()
         expagg = features.IdCache()
@@ -650,26 +593,6 @@ class TestPrecise(unittest.TestCase):
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,3)     
-
-    def test_robust_stoch(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samplesstoch,decagg=decagg,expagg=expagg)
-        values, policy, residual = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],0.9,200)
-    
-        des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
-        for a,b in zip(des, values):
-            self.assertAlmostEqual(a,b,3)
-            
-    def test_robust_deter(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samples,decagg=decagg,expagg=expagg)
-        values, policy, residual = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],0.9,300)
-    
-        des = [ 30., 30., 29., 27.1, 29., 30., 30.]
-        for a,b in zip(des, values):
-            self.assertAlmostEqual(a,b,2)
 
     def test_crobust_deter(self):
         decagg = features.IndexCache()
@@ -781,39 +704,6 @@ class RobustTests(unittest.TestCase):
         for s,r in zip(states,results):
             self.assertEqual(c(s),r)
             
-    def test_matrix_construction(self):
-        samples = examples.chain.simple_samples(7,1)
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-    
-        result = robust.matrices(samples,decagg=decagg,expagg=expagg)
-        
-        for r in result['dectoexp']:
-            self.assertEqual(r.shape, (2,1))
-        
-        toexpstates  = np.concatenate(result['dectoexp']).flatten()
-            
-        self.assertEqual(len(set(toexpstates)), 14)
-        self.assertEqual(len(toexpstates), 14)
-        self.assertEqual(result['exptodec'].shape, (14, 7))
-        self.assertEqual(result['dectoexp'].shape, (7,))
-        self.assertEqual(len(result['initial']), 7)
-        self.assertEqual(result['rewards'].shape, (14,))
-        self.assertEqual(len(result['actions']), 2)
-        
-    def test_robust_deter(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        samples = examples.chain.simple_samples(7,0.75)
-        result = robust.matrices(samples,decagg=decagg,expagg=expagg)
-        values, policy, residual = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],0.9,300)
-    
-        des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
-        for a,b in zip(des, values):
-            self.assertAlmostEqual(a,b,2)        
-            
-        self.assertEquals(list(policy.argmax(1)), [0, 0, 0, 0, 1, 1, 1])
-        
     def test_l1_worstcase(self):
         q = np.array([0.4, 0.3, 0.1, 0.2])
         z = np.array([1,2,5,4])
@@ -1024,12 +914,6 @@ class RobustRecommender(unittest.TestCase):
         v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001)
         self._check_vrobust(v[0])
         
-    def test_python_implementation(self):
-        result = self.result
-        values, policy_vec, residual = robust.vi_gs(result['dectoexp'],\
-                                    result['exptodec'],result['rewards'],1,100)
-        self._check_vrobust(values)
-    
     def test_l1_half(self):
         self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_gs_l1(1000)
@@ -1240,11 +1124,6 @@ class RobustRecommenderOptimistic(unittest.TestCase):
         v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001, stype=1)
         self._check_vrobust(v[0])
         
-    def test_python_implementation(self):
-        result = self.result
-        values, policy_vec, residual, _ = robust.vi_gs(result['dectoexp'],result['exptodec'],result['rewards'],1,100,type='optimistic')
-        self._check_vrobust(values)
-    
     def test_l1_half(self):
         self.rmdp.set_uniform_thresholds(0.5)
         v = self.rmdp.vi_gs_l1(1000, stype=1)

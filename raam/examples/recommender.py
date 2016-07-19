@@ -195,7 +195,7 @@ class Recommender(raam.Simulator):
             recom_prob_sum = np.sum(recom_prob)
             if random() <= recom_prob_sum:
                 _log('taking recommendation %s' % str(action))
-                chosen = action[choice(recom_prob / recom_prob_sum)]
+                chosen = action[np.random.choice(len(recom_prob), p=(recom_prob / recom_prob_sum))]
                 return 0,(chosen,segment)
         # decide whether to leave
         leave_prob = leave_probability(currvalue)

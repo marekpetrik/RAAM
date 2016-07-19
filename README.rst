@@ -35,6 +35,7 @@ Requirements:
 - Setuptools 7.0
 - Numpy 1.8+
 - Scipy 0.13 
+- Cython 0.21+ 
 - craam 1.0+ Methods for solving robust MDPs
 
 The package has been tested only on Linux.
