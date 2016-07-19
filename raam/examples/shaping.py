@@ -79,6 +79,20 @@ class ConfigSimple:
         return value_exp / np.sum(value_exp)
 
 class Simulator(raam.Simulator):
+    """
+    Simulates demand shaping and customer choice
+
+    There are two types of states. Expectation and decision states.
+    -  Decision state: A tuple representation with (customer, inventory)
+            * customer: the type of the customer (int) 
+            * inventory: current inventory (vector)
+    - Expectation state: The expectation state with (purchase probabilities, reward, inventory)
+            * purchase probabilities - cumulative sum (vector)
+            * reward for the action (float)
+
+    The simulator works with a wrapper state (a tuple):
+        (is_decision:bool, inner state)
+    """
 
     def __init__(self, filename=None,config=None):
         """ If no filename and no configuration are provided, 
@@ -98,10 +112,26 @@ class Simulator(raam.Simulator):
         with open(filename, mode='wb') as fileoutput:
             pickle.dump(self.config,fileoutput)
 
-
     @property
     def discount(self):
         return 0.95
+
+    def transition(self, state, action):
+        """
+        Transition from either expectation or decision state.
+        """
+        is_decision, inner_state = state
+
+        if is_decision:
+            # the following state must be an expectation one
+            newstate = (False, self.transition_dec(inner_state, action))
+            reward = 0
+        else:
+            reward, newinnerstate = self.transition_exp(inner_state)
+            newstate = (True, newinnerstate)
+        
+        return reward, newstate
+
 
     def transition_dec(self,decstate,action):
         """ 
@@ -113,20 +143,13 @@ class Simulator(raam.Simulator):
         ----------
         decstate : decision state
             A tuple representation with (customer, inventory)
-            * customer - the type of the customer (int) 
-            * inventory - current inventory (vector)
         action : set(int) 
             The set of the number of products that are recommended
                     the number of of the action
-
         Returns
         -------
         out : expectation state
             The expectation state with (purchase probabilities, reward, inventory)
-            * purchase probabilities - cumulative sum (vector)
-            * reward for the action (float)
-            * inventory (vector)
-
         """
         customer, inventory = decstate
         assert len(inventory) == len(self.config.product_types)
@@ -145,17 +168,12 @@ class Simulator(raam.Simulator):
         Parameters
         ----------
         expstate : expectation state
-            The expectation state with (purchase probabilities, reward, inventory)
-            * purchase probabilities - cumulative sum (vector)
-            * reward for the action (float)
 
         Returns
         -------
         out : tuple(reward, decision state)
             * Reward is a float reward
             * Decision states is a tuple(customer, inventory)
-                * customer - the type of the customer (int) 
-                * inventory - current inventory (vector)
         """
         purchprobs, profitaction, inventory = expstate
         inventory = inventory.copy()
@@ -180,12 +198,21 @@ class Simulator(raam.Simulator):
         inventory[refresh] += 1
         return (profit, (customer, inventory))
 
-    def actions(self,decstate):
-        return [frozenset()] + [frozenset([i]) for i,t in enumerate(self.config.action_types)] 
+    def actions(self,state):
+        """
+        Available actions in decision states are configured. And there is only 
+        a single action available in an expectation state.
+        """
+        is_decision, _ = state
+        if is_decision:
+            return [frozenset()] + [frozenset([i]) for i,t in enumerate(self.config.action_types)] 
+        else:
+            return [frozenset()]
 
     def initstates(self):
+        """ There is a single initial state """
         c = self.config
-        return itertools.repeat( (c.initial_customer, c.initial_inventory) )
+        return itertools.repeat( (True,(c.initial_customer, c.initial_inventory)) )
 
 def decstate_rep(decstate):
     """ Computes the representation of a decision state """

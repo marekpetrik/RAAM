@@ -18,7 +18,6 @@ class Simulator(raam.Simulator):
     """
     Simulator of the inverted pendulum:
         * Decision state: decstate = (theta, dtheta)
-        * Expectation state: expstate = (decstate,action)
     """
 
     actionset = [-50,0,50]
@@ -47,13 +46,8 @@ class Simulator(raam.Simulator):
     def discount(self):
         return 0.99
 
-    def transition_dec(self,decstate,action):
-        """ decstate = (theta, dtheta) """
-        return (tuple(decstate),action)
-
-    def transition_exp(self,expstate):
+    def transition(self,decstate,action):
         """ expstate = (decstate, action) """
-        decstate,action = expstate
         theta = decstate[0] 
         dtheta = decstate[1]
         alpha = 1/(self.m + self.M)
@@ -115,17 +109,6 @@ def decstate_rep(decstate):
     dtheta = decstate[1]
     return [theta, dtheta] 
 
-def expstate_rep(expstate):
-    """
-    List representation of an expectation state.
-    """
-    decstate,action = expstate
-    theta = decstate[0] 
-    dtheta = decstate[1]
-    result = list(decstate) + [action]
-    return result
-
-Representation = {'decmap':decstate_rep, 'expmap':expstate_rep}
 
 class Features:
     """ 

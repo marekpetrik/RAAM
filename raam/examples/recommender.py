@@ -1,5 +1,4 @@
 import raam
-from raam.examples.fastrandom import choice
 import numpy as np
 from itertools import combinations
 from random import random
@@ -69,7 +68,6 @@ def recommendation_probabilities(currentvalue,values):
     values : array
         Values of the recommended items
     """
-    # TODO: the value 3 is arbitrary and should be fit to data
     a = exp(3)
     b = exp(currentvalue)
     v = np.exp(values)
@@ -169,15 +167,9 @@ class Recommender(raam.Simulator):
     def discount(self):
         return 1.0
         
-    def transition_dec(self,decstate,action):
-        """ Computes a deterministic transition """
-        product, segment = decstate 
-        assert segment < len(self.segmentprobs)
-        return (product,segment,action)
-        
-    def transition_exp(self,expstate):
+    def transition(self,decstate,action):
         """ Computes a transition """
-        product, segment, action = expstate
+        product, segment = decstate 
         
         currvalue = self.preferences[segment,product]
         _log('considering product %d' % product)
@@ -204,7 +196,7 @@ class Recommender(raam.Simulator):
             return 0, self.endstate
         # decide whether to just look at a different product
         _log('resetting product choice')
-        return 0,(choice(self.prodprobs[segment,:]),segment)
+        return 0,(np.random.choice(self.prodprobs.shape[1], p=self.prodprobs[segment,:]),segment)
         
     def end_condition(self,decstate):
         product, segment = decstate
@@ -212,8 +204,8 @@ class Recommender(raam.Simulator):
         
     def initstates(self):
         while True:
-            customer = choice(self.segmentprobs)
-            product = choice(self.prodprobs[customer,:])
+            customer = np.random.choice(len(self.segmentprobs), p=self.segmentprobs)
+            product = np.random.choice(self.prodprobs.shape[1], p=self.prodprobs[customer,:])
             assert customer < len(self.segmentprobs)
             yield (product,customer)
         

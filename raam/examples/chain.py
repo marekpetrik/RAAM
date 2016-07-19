@@ -36,39 +36,38 @@ def simple_samples(length,succprob):
     """
 
     sc = length
+    # sets i-th element to 1, others to 0
     def ei(l,i):
         q = np.zeros(l)
         q[i] = 1
         return q
+
     #left and right actions
     def actions(self, decstate):
         return ['l','r']
     
     samples = raam.MemSamples()
         
-    
     #left action
     for i in range(sc):
-        samples.add_dec(raam.DecSample(ei(sc,i),'l',ei(2*sc,i),0,1))
-    #right action
-    for i in range(sc):
-        samples.add_dec(raam.DecSample(ei(sc,i),'r',ei(2*sc,sc+i),0,1))
+        nl = max(i-1,0)     # next left
+        nr = min(i+1,sc-1)  # next right
+        samples.add_sample(raam.Sample(ei(sc,i),'l',ei(sc,nl),abs(nl - floor(sc/2)),\
+                            succprob,1,0))
+        samples.add_sample(raam.Sample(ei(sc,i),'l',ei(sc,nr),abs(nr - floor(sc/2)),\
+                            1-succprob,0,1))
 
     #expstates are results of left-right actions
     expstates = []
-    #left action
-    for i in range(sc):
-        nl = max(i-1,0)
-        nr = min(i+1,sc-1)
-        samples.add_exp(raam.ExpSample(ei(2*sc,i),ei(sc,nl),abs(nl - floor(sc/2)),succprob,1,0))
-        samples.add_exp(raam.ExpSample(ei(2*sc,i),ei(sc,nr),abs(nr - floor(sc/2)),1-succprob,0,1,0))
         
     #right action
     for i in range(sc):
-        nl = max(i-1,0)
-        nr = min(i+1,sc-1)
-        samples.add_exp(raam.ExpSample(ei(2*sc,sc+i),ei(sc,nl),abs(nl - floor(sc/2)),1-succprob,0,1,0))
-        samples.add_exp(raam.ExpSample(ei(2*sc,sc+i),ei(sc,nr),abs(nr - floor(sc/2)),succprob,0,1,0))
+        nl = max(i-1,0)     # next left
+        nr = min(i+1,sc-1)  # next right
+        samples.add_sample(raam.Sample(ei(sc,i),'r',ei(sc,nl),abs(nl - floor(sc/2)),\
+                                1-succprob,0,1))
+        samples.add_sample(raam.Sample(ei(sc,i),'r',ei(sc,nr),abs(nr - floor(sc/2)),\
+                                succprob,0,1))
     
     return samples
 

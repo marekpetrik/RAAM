@@ -12,7 +12,6 @@ import raam
 class Counter(raam.simulator.Simulator):  
     """
     Decision state: position in chain
-    Expectation state: position in chain, change (+1,-1)
     Initial (decision) state: 0
     Actions: {plus, minus}
     Rewards: succ_prob%: next position, 1-succ_prob% this position in chain
@@ -30,17 +29,16 @@ class Counter(raam.simulator.Simulator):
     def discount(self):
         return 0.9
         
-    def transition_dec(self,decstate,action):
-        if action == 'plus':
-            return (decstate, +1)
-        elif action == 'minus':
-            return (decstate, -1)
-        else:
-            raise ValueError('Invalid action')
-        
-    def transition_exp(self,expstate):
-        pos,act = expstate
+    def transition(self,pos,action):
+       
         if random.random() <= self.succ_prob:
+            if action == 'plus':
+                act = +1
+            elif action == 'minus':
+                act = -1
+            else:
+                raise ValueError('Invalid action')
+
             return pos,pos + act
         else:
             return pos,pos
@@ -54,57 +52,3 @@ class Counter(raam.simulator.Simulator):
     def actions(self,decstate):
         return ['plus','minus']
 
-
-class StatefulCounter(raam.simulator.StatefulSimulator):  
-    """
-    Decision state: position in chain
-    Expectation state: position in chain, change (+1,-1)
-    Initial (decision) state: 0
-    Actions: {plus, minus}
-    Rewards: succ_prob%: next position, 1-succ_prob% this position in chain
-
-    Parameters
-    ----------
-    succ_prob : float
-        Success probability of the action taken; otherwise the transition does
-        not happen.
-    """
-
-    def __init__(self, succ_prob=0.9):
-        self.state = None
-        self.succ_prob = succ_prob
-
-    @property
-    def discount(self):
-        return 0.9
-        
-    def transition_dec(self,action):
-        decstate = self.state
-        
-        if action == 'plus':
-            self.state = (decstate, +1)
-        elif action == 'minus':
-            self.state = (decstate, -1)
-        else:
-            raise ValueError('Invalid action')
-        
-        return self.state
-        
-    def transition_exp(self):        
-        pos,act = self.state
-
-        if random.random() <= self.succ_prob:
-            self.state = pos + act
-        else:
-            self.state = pos            
-        return pos,self.state            
-            
-    def end_condition(self,decstate):
-        return False
-        
-    def reinitstate(self,param):
-        self.state = 0
-        return self.state
-        
-    def actions(self):
-        return ['plus','minus']

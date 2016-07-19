@@ -3,7 +3,8 @@
 Sample manipulation (:mod:`raam.samples`)
 =============================================
 
-This package provides tools for constructing, validating, generating, and manipulating samples.
+This package provides tools for constructing, validating, generating, 
+and manipulating samples.
 """
 import json
 import numpy as np
@@ -13,6 +14,7 @@ import abc
 import operator
 import itertools
 import collections
+from copy import copy
 
 def _itlen(iterator):
     return sum(1 for _ in iterator)
@@ -21,118 +23,65 @@ class FormattingError(Exception):
     """ Represents a formatting error. """
     pass
 
-class ExpSample:
-    """
-    A sample that starts in an expectation state
-    """
-    def __init__(self,expStateFrom, decStateTo, reward, weight, step, run, other = None):
-        self.expStateFrom = expStateFrom
-        self.decStateTo = decStateTo
-        self.reward = reward
-        self.weight = weight
-        self.step = step 
-        self.run = run
-        self.other = other
-        
-    def map(self, decmap, expmap, actmap):
-        return ExpSample(expmap(self.expStateFrom), decmap(self.decStateTo),\
-                    self.reward, self.weight, self.step, self.run, self.other)
-        
-class DecSample:
+class Sample:
     """
     A sample that starts in a decision state
     """
-    def __init__(self, decStateFrom, action, expStateTo, step, run, other = None):
-        self.decStateFrom = decStateFrom
+    def __init__(self, statefrom, action, stateto, reward, weight, step, run):
+        self.statefrom = statefrom
         self.action = action
-        self.expStateTo = expStateTo
+        self.stateto = stateto
+        self.reward = reward
+        self.weight = weight
         self.step = step
         self.run = run
-        self.other = other
         
-    def map(self, decmap, expmap, actmap):
-        return DecSample(decmap(self.decStateFrom), actmap(self.action), \
-                expmap(self.expStateTo), self.step, self.run, self.other)
+    def map(self, decmap, actmap):
+        return Sample(decmap(self.statefrom), actmap(self.action), \
+               decmap(self.stateto) , self.step, self.run)
         
 
 class Samples(metaclass=abc.ABCMeta):
-    """
-    General representation of the samples class
-    """
-    @abc.abstractmethod
-    def expsamples(self):
-        """
-        Returns an iterator over expectation samples.
-        """
-        pass
     
     @abc.abstractmethod
-    def decsamples(self):
-        """
-        Returns an iterator over decision samples.
-        """
+    def samples(self):
+        """ Returns an iterator over decision samples.  """
         pass
     
     @abc.abstractmethod
     def initialsamples(self):
-        """
-        Returns an iterator over the initial samples.
-        """
+        """ Returns an iterator over the initial samples.  """
         pass
         
     @abc.abstractmethod
-    def add_exp(self, expsample):
-        """
-        Adds an expectation sample.
-        """
-        pass
-        
-    @abc.abstractmethod
-    def add_dec(self, decsample):
-        """
-        Adds a decision sample.
-        """
+    def add_sample(self, sample):
+        """ Adds an transition sample.  """
         pass
         
     @abc.abstractmethod
     def add_initial(self, decstate):
-        """
-        Adds and initial state
-        """
+        """ Adds and initial state """
         pass
         
     @abc.abstractmethod
-    def purge_exp(self):
-        """
-        Removes all expectation samples
-        """
-        pass
-    
-    @abc.abstractmethod
-    def purge_dec(self):
-        """
-        Removes all decision samples
-        """
+    def purge_samples(self):
+        """ Removes all decision samples """
         pass
         
     @abc.abstractmethod
     def purge_initial(self):
-        """
-        Removes all initial state samples
-        """
+        """ Removes all initial state samples """
         pass
         
     @abc.abstractmethod
-    def copy(self,exp=True,dec=True,initial=True):
+    def copy(self,samples=True,initial=True):
         """
         Returns a copy of the samples that can be modified
         
         Parameters
         ----------
-        exp : bool, optional 
-            Whether to copy expectation samples
-        dec : bool, optional
-            Whether to copy decision samples
+        samples : bool optional
+            Whether to copy transition samples
         initial : bool, optional
             Whether to copy initial states
         """
@@ -147,21 +96,20 @@ class Samples(metaclass=abc.ABCMeta):
         samples : Samples
             The second set of samples
         """
-        for d in samples.decsamples():
-            self.add_dec(d)
-            
-        for e in samples.expsamples():
-            self.add_exp(e)
+        for d in samples.samples():
+            self.add_sample(copy(d))
             
     
     def validate(samples):
         """ 
-        Checks the structure of the samples and returns basic statistics in a dictionary.
+        Checks the structure of the samples and returns basic statistics 
+        in a dictionary.
+        
         Raises a formatting error when the data is incorrect.
     
         Returns
         -------
-        decStates : int
+        samples : int
             Number of decision states
         expStates : int
             Number of expectation states
@@ -170,17 +118,16 @@ class Samples(metaclass=abc.ABCMeta):
         --------
         create_test_sample
         """
-    
-        runs = len(set(e.run for e in samples.expsamples()) | set(d.run for d in samples.decsamples()))
+        runs = len(set(d.run for d in samples.samples()))
         
-        return {'decStates':_itlen(samples.decsamples()), \
-                'expStates':_itlen(samples.expsamples()), \
+        return {'samples':_itlen(samples.samples()), \
                 'runs':runs}
 
     def statistics(samples, discount):
         """
-        Computes statistics of the samples, such as the expected reward and the maximal number of steps.
-        It also computes the average return of a sample set. The discount is applied based
+        Computes statistics of the samples, such as the expected reward 
+        and the maximal number of steps. It also computes the average 
+        return of a sample set. The discount is applied based
         on the step value of each transition sample.
     
         Parameters
@@ -217,9 +164,13 @@ class Samples(metaclass=abc.ABCMeta):
         sums = {}
     
         k = lambda o: o.run
+
+        # arrange samples by runs to make it easy to compute statistics for each 
         runs = [ list(run) for _,run in \
-                itertools.groupby(sorted(samples.expsamples(),key=k),key=k)]
-        mean_return = sum(e.reward * (discount ** e.step) for e in samples.expsamples()) / len(runs)
+                itertools.groupby(sorted(samples.samples(),key=k),key=k)]
+
+        mean_return = sum(e.reward * (discount ** e.step) \
+                                for e in samples.samples()) / len(runs)
         
         return {'mean_return' : mean_return, \
                 'max_step' : [max(e.step for e in run) for run in runs], \
@@ -234,14 +185,13 @@ class MemSamples(Samples):
     as JSON.
     """
     
-    def __init__(self,dec_samples=None,exp_samples=None,init_samples=None):
+    def __init__(self,samples=None,init_samples=None):
         """ 
         Creates empty sample dictionary and returns it.
         
         Can take arguments that describe the content of the samples.
         """
-        self.dec_samples = dec_samples if dec_samples is not None else []
-        self.exp_samples = exp_samples if exp_samples is not None else []
+        self.dec_samples = samples if samples is not None else []
         self.init_samples = init_samples if init_samples is not None else []
 
     def encode_json(samples, validate=True):
@@ -261,7 +211,9 @@ class MemSamples(Samples):
         
         if validate:
             samples.validate()
-        return json.dumps({'expSamples':samples.exp_samples, 'decSamples':samples.dec_samples, 'initSamples':samples.init_samples } )
+
+        return json.dumps({ 'samples':samples.dec_samples, 
+                            'initial':samples.init_samples } )
         
     @staticmethod
     def decode_json(jsonstring, validate=True):
@@ -282,9 +234,8 @@ class MemSamples(Samples):
         """
         samples = MemSamples()
         loaded = json.loads(jsonstring)
-        samples.dec_samples = loaded['decSamples']
-        samples.exp_samples = loaded['expSamples']
-        samples.init_samples = loaded['initSamples']
+        samples.dec_samples = loaded['samples']
+        samples.init_samples = loaded['initial']
         if validate:
            samples.validate()
         return samples
@@ -314,68 +265,37 @@ class MemSamples(Samples):
            samples.validate()
         return samples        
         
-    def expsamples(self):
-        """
-        Returns an iterator over expectation samples.
-        """
-        return (s for s in self.exp_samples)
-    
-    def decsamples(self):
-        """
-        Returns an iterator over decision samples.
-        """
+    def samples(self):
+        """ Returns an iterator over transition samples.  """
         return (s for s in self.dec_samples)
         
     def initialsamples(self):
-        """
-        Returns samples of initial decision states.
-        """
+        """ Returns samples of initial decision states.  """
         return (s for s in self.init_samples)
 
-    def add_exp(self, expsample):
-        """
-        Adds an expectation sample.
-        """
-        self.exp_samples.append(expsample)
-        
-    def add_dec(self, decsample):
-        """
-        Adds a decision sample.
-        """
+    def add_sample(self, decsample):
+        """ Adds a decision sample.  """
         self.dec_samples.append(decsample)
         
     def add_initial(self, decstate):
-        """
-        Adds an initial state.
-        """
+        """ Adds an initial state.  """
         self.init_samples.append(decstate)
         
-    def purge_exp(self):
-        """
-        Removes all expectation samples
-        """
-        self.exp_samples = []
-
-    def purge_dec(self):
-        """
-        Removes all decision samples
-        """
+    def purge_samples(self):
+        """ Removes all decision samples """
         self.dec_samples = []
     
     def purge_initial(self):
-        """
-        Removes all initial state samples
-        """
+        """ Removes all initial state samples """
         self.init_samples = []
         
-    def copy(self,dec=True,exp=True,initial=True):
+    def copy(self,samples=True,initial=True):
         """
         Returns a copy of the samples that can be modified
         """
-        des = list(self.decsamples()) if dec else None
-        exs = list(self.expsamples()) if exp else None
+        des = list(self.samples()) if samples else None
         ins = list(self.initialsamples()) if initial else None
-        return MemSamples(des,exs,ins)
+        return MemSamples(des,ins)
 
 
 identity = lambda x: x
@@ -388,15 +308,10 @@ class SampleView(Samples):
     ----------
     samples : raam.Samples
         Samples to be viewed and possibly added
-    decmap : function, optional
+    statemap : function, optional
         A function that maps decision states to their new representation
-    decmapinv : function, optional
+    statemapinv : function, optional
         A function that maps the new representation of decision states to 
-        the underlying format
-    expmap : function, optional
-        A function that maps expectation states to their new representation
-    expmapinv : function, optional
-        A function that maps the new representation of expectation states to 
         the underlying format
     actmap : function, optional
         A function that maps actions to their new representation 
@@ -414,33 +329,23 @@ class SampleView(Samples):
     used to add more samples to the representation.
     """
     def __init__(self,samples,\
-                    decmap=identity,decmapinv=identity, \
-                    expmap=identity,expmapinv=identity, \
+                    statemap=identity,statemapinv=identity, \
                     actmap=identity,actmapinv=identity, \
                     readonly=False):
         
-        self.samples    = samples
-        self.decmap     = decmap
-        self.decmapinv  = decmapinv
-        self.expmap     = expmap
-        self.expmapinv  = expmapinv
+        self.samples      = samples
+        self.statemap     = statemap
+        self.statemapinv  = statemapinv
         self.actmap     = actmap
         self.actmapinv  = actmapinv
         self._readonly  = readonly
 
-    def expsamples(self):
-        """
-        Returns an iterator over expectation samples.
-        """
-        return (s.map(self.decmap,self.expmap,self.actmap) \
-                    for s in self.samples.expsamples())
-    
-    def decsamples(self):
+    def samples(self):
         """
         Returns an iterator over decision samples.
         """
         return (s.map(self.decmap,self.expmap,self.actmap) \
-                    for s in self.samples.decsamples())
+                    for s in self.samples.samples())
         
     def initialsamples(self):
         """
@@ -448,17 +353,7 @@ class SampleView(Samples):
         """
         return (self.decmap(s) for s in self.samples.initialsamples())
 
-    def add_exp(self, expsample):
-        """
-        Adds an expectation sample.
-        """
-        if not self._readonly:
-            s = expsample.map(self.decmapinv,self.expmapinv,self.actmapinv)
-            self.samples.add_exp(s)
-        else:
-            raise NotImplementedError('Cannot modify readonly view.')
-        
-    def add_dec(self, decsample):
+    def add_sample(self, decsample):
         """
         Adds a decision sample.
         """
@@ -478,13 +373,7 @@ class SampleView(Samples):
         else:
             raise NotImplementedError('Cannot modify readonly view.')                        
         
-    def purge_exp(self):
-        """
-        Removes all expectation samples
-        """
-        raise NotImplementedError('Not supported.')
-
-    def purge_dec(self):
+    def purge_samples(self):
         """
         Removes all decision samples
         """
@@ -502,24 +391,4 @@ class SampleView(Samples):
         """
         raise NotImplementedError('Not supported.')
 
-
-def create_test_sample():
-    """ 
-    Creates a test in-memory sample and returns it 
-    
-    See Also
-    --------
-    raam.samples.MemSamples
-    """
-    
-    samples = MemSamples()
-    
-    s_decstates = [[0,1],[1,2],[2,3]]
-    s_expstates = [[5,6],[6,7],[7,8]]
-    profits = [1,2,3]
-    
-    for i,(d,e,p) in enumerate(zip(s_decstates, s_expstates, profits)):
-        samples.add_exp(ExpSample(e, d, p, 1.0, i, 0))
-        samples.add_dec(DecSample(d, 1, e, i, 0))
-    return samples
 
