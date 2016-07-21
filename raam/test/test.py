@@ -257,40 +257,51 @@ class TestPrecise(unittest.TestCase):
             self.assertAlmostEqual(a,b,3)     
     
     def test_crobust_stoch_re(self):
-        m = craam.MDP(7, 0.9)
+        rm = craam.RMDP(7, 0.9)
+        
+        # add fake transitions for all outcomes (weight ~ 0, and all outcomes )
+        states = {sam.statefrom for sam in self.samplesstochd.samples()} | {sam.stateto for sam in self.samplesstochd.samples()}
+        actions = {sam.action for sam in self.samplesstochd.samples()}
+        
+        # add transitions from all outcomes to all states, just to make sure that there
+        # is one for each outcome
+        for sfrom in states:
+            for a in actions:
+                for sto in states:
+                    rm.add_transition(sfrom,a,sto,sto,0.00000001,0)
+        
+        statecount = len(states)
+        
+        distributions = [np.zeros((statecount,statecount)) for a in actions]
+        
         for s in self.samplesstochd.samples():
-            m.add_transition(s.statefrom, s.action, s.stateto, s.weight, s.reward)
-        valuefunction,_,_ ,_= m.vi_jac(200)
-    
+            # the transition from the outcome to the action is 1
+            rm.add_transition(s.statefrom, s.action, s.stateto, s.stateto, 1, s.reward)
+            # set the distribution
+            distributions[s.action][s.statefrom, s.stateto] = s.weight
+        
+        # set the distributions to outcomes
+        for s in states:
+            for a in actions:
+                rm.set_distribution(s,a,distributions[a][s,:])
+        
+        #import pprint
+        #import json
+        #pprint.pprint(json.loads(rm.to_json()))
+        
+        
+        rm.set_uniform_thresholds(0)
+        valuefunction,_,_,_,_  = rm.vi_gs(200)
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,3)     
-
-    @unittest.skip("deal with later")
-    def test_crobust_deter(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samples,decagg=decagg,expagg=expagg)
-        rmdp = crobust.RoMDP(7,0.9)
-        rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_,_ = rmdp.vi_gs(200)
-    
-        des = [ 30., 30., 29., 27.1, 29., 30., 30.]
+                
+        rm.set_uniform_thresholds(2)
+        valuefunction,_,_,_,_  = rm.vi_gs(200,stype=1)
+        des = [ 30., 30., 29., 27.1, 29., 30., 30.]    
         for a,b in zip(des, valuefunction):
-            self.assertAlmostEqual(a,b,2)
-            
-    @unittest.skip("deal with later")            
-    def test_crobust_deter_re(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samples,decagg=decagg,expagg=expagg)
-        rmdp = crobust.RoMDP(7,0.9)
-        rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_,_ = rmdp.vi_jac(200)
-    
-        des = [ 30., 30., 29., 27.1, 29., 30., 30.]
-        for a,b in zip(des, valuefunction):
-            self.assertAlmostEqual(a,b,2)            
+            self.assertAlmostEqual(a,b,3)     
+          
 
 class RobustTests(unittest.TestCase):
     """ Test robust methods"""
@@ -476,7 +487,7 @@ class RobustTests(unittest.TestCase):
         
 from operator import itemgetter
         
-@unittest.skip("deal with later")
+@unittest.skip("todo")
 class RobustRecommender(unittest.TestCase):       
     def setUp(self):
         np.random.seed(0)
