@@ -438,7 +438,7 @@ class DiscreteSampleView(raam.samples.SampleView):
         for v in actmapinit:
             self.actmap(v)        
         
-        super().__init__(samples, decmap=self.decmap, expmap=self.expmap, \
+        super().__init__(samples, statemap=self.decmap, \
                 actmap=self.actmap)
 
     def all_decstates(self):
@@ -461,3 +461,5 @@ class DiscreteSampleView(raam.samples.SampleView):
         """
         return list(map(itemgetter(0), \
                     sorted(self.actmap.state_vals.items(),key=itemgetter(1))))
+                    
+    

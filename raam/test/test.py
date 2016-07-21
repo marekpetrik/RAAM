@@ -11,6 +11,8 @@ import numpy as np
 import itertools
 import json
 
+import craam
+
 from raam import features
 from raam import crobust
 from raam import robust
@@ -66,21 +68,21 @@ class BasicTestsSimulation(unittest.TestCase):
         random.seed(1000)
         np.random.seed(1000)
         sim = raam.examples.shaping.Simulator()
-        result = sim.simulate(1,raam.examples.shaping.policyNoAction,1)
+        result = sim.simulate(2,raam.examples.shaping.policyNoAction,1)
         ret = result.statistics(sim.discount)['mean_return']
         stats = result.validate()
-        self.assertEqual(1, stats['samples'])
-        self.assertAlmostEqual(0.040709624769089126, ret)
+        self.assertEqual(2, stats['samples'])
+        self.assertAlmostEqual(0.039678834047865277, ret)
 
     def test_check_simulation_multiple(self):
         random.seed(1000)
         np.random.seed(1000)
         sim = raam.examples.shaping.Simulator()
-        result = sim.simulate(self.horizon,raam.examples.shaping.policyNoAction,range(5))
+        result = sim.simulate(2*self.horizon,raam.examples.shaping.policyNoAction,range(5))
         ret = result.statistics(sim.discount)['mean_return']
         stats = result.validate()
-        self.assertAlmostEqual(2.9996420337426062, ret, 4)
-        self.assertEqual(30*5, stats['samples'])
+        self.assertAlmostEqual(2.9236894010933661, ret, 4)
+        self.assertEqual(2*self.horizon*5, stats['samples'])
         
     def test_check_simulation_multiple_counter(self):
         random.seed(1000)
@@ -232,59 +234,39 @@ class SimulationSamplesTerminationTests(unittest.TestCase):
                     transitionlimit=200)
         self.assertEqual(200,len(tuple(samples.samples()))) 
 
-class TestFeatures(unittest.TestCase):
-    """ Test feature generation """
-    
-    @unittest.skip("known problem")
-    def test_dec_does_not_change(self):
-        q = create_test_sample()
-        qb = create_test_sample()
-        feature = lambda state: [1,2,3,4]
-        transformed = features.apply_dec(q, feature)
-        self.assertEquals(q.encode_json(), qb.encode_json())
-        self.assertNotEquals(q.encode_json(), transformed.encode_json())
 
-    @unittest.skip("known problem")
-    def test_exp_does_not_change(self):
-        q = create_test_sample()
-        qb = create_test_sample()
-        feature = lambda state: [1,2,3,4]
-        transformed = features.apply_exp(q, feature)
-        self.assertEquals(q.encode_json(), qb.encode_json())
-        self.assertNotEquals(q.encode_json(), transformed.encode_json())
-    
-@unittest.skip("deal with later")
 class TestPrecise(unittest.TestCase):
     """ Test precise MDP solvers """
     def setUp(self):
         self.samples = examples.chain.simple_samples(7,1)
+        self.samplesd = features.DiscreteSampleView(self.samples)
         self.samplessmall = examples.chain.simple_samples(3,1)
+        self.samplessmalld = features.DiscreteSampleView(self.samplessmall)
         self.samplesstoch = examples.chain.simple_samples(7,0.75)
+        self.samplesstochd = features.DiscreteSampleView(self.samplesstoch)
+
     
     def test_crobust_stoch(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samplesstoch,decagg=decagg,expagg=expagg)
-        rmdp = crobust.RoMDP(7,0.9)
-        rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_,_ = rmdp.vi_gs(200)
+        m = craam.MDP(7, 0.9)
+        for s in self.samplesstochd.samples():
+            m.add_transition(s.statefrom, s.action, s.stateto, s.weight, s.reward)
+        valuefunction,_,_ ,_= m.vi_gs(200)
     
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,3)     
-            
+    
     def test_crobust_stoch_re(self):
-        decagg = features.IndexCache()
-        expagg = features.IdCache()
-        result = robust.matrices(self.samplesstoch,decagg=decagg,expagg=expagg)
-        rmdp = crobust.RoMDP(7,0.9)
-        rmdp.from_sample_matrices(result['dectoexp'],result['exptodec'],result['actions'],result['rewards'])
-        valuefunction,_,_,_,_ = rmdp.vi_jac(200)
+        m = craam.MDP(7, 0.9)
+        for s in self.samplesstochd.samples():
+            m.add_transition(s.statefrom, s.action, s.stateto, s.weight, s.reward)
+        valuefunction,_,_ ,_= m.vi_jac(200)
     
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,3)     
 
+    @unittest.skip("deal with later")
     def test_crobust_deter(self):
         decagg = features.IndexCache()
         expagg = features.IdCache()
@@ -297,6 +279,7 @@ class TestPrecise(unittest.TestCase):
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,2)
             
+    @unittest.skip("deal with later")            
     def test_crobust_deter_re(self):
         decagg = features.IndexCache()
         expagg = features.IdCache()

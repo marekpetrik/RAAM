@@ -38,8 +38,19 @@ class Sample:
         
     def map(self, decmap, actmap):
         return Sample(decmap(self.statefrom), actmap(self.action), \
-               decmap(self.stateto) , self.step, self.run)
-        
+               decmap(self.stateto), self.reward, self.weight, self.step, self.run)
+    
+    def __str__(self):
+        """ String representation """
+        # decide whether to use new lines in the description
+        if type(self.statefrom) == int and type(self.action) == int:
+            return "From: {0.statefrom}; Action: {0.action}; To: {0.stateto}; Reward: {0.reward}; Weight: {0.weight}".format(self)            
+        else:
+            return "From: {0.statefrom}\nAction: {0.action}\nTo: {0.stateto}\nReward: {0.reward}\nWeight: {0.weight}".format(self)        
+    
+    def __repr__(self):
+        """ String representation """            
+        return self.__str__()
 
 class Samples(metaclass=abc.ABCMeta):
     
@@ -240,31 +251,6 @@ class MemSamples(Samples):
            samples.validate()
         return samples
         
-    @staticmethod
-    def from_dict(loaded, validate=True):
-        """
-        Decodes samples from a json file to a dictionary
-    
-        Parameters
-        ----------
-        loaded : dictionary
-            simple dictionary encoding of the samples
-        validate : bool, optional
-            Validate samples after they are loaded
-    
-        Returns
-        -------
-        out : MemSamples
-            Samples loaded in MemSamples
-        """
-        samples = MemSamples()
-        samples.dec_samples = loaded['decSamples']
-        samples.exp_samples = loaded['expSamples']
-        samples.init_samples = loaded['initSamples']
-        if validate:
-           samples.validate()
-        return samples        
-        
     def samples(self):
         """ Returns an iterator over transition samples.  """
         return (s for s in self.dec_samples)
@@ -333,33 +319,33 @@ class SampleView(Samples):
                     actmap=identity,actmapinv=identity, \
                     readonly=False):
         
-        self.samples      = samples
-        self.statemap     = statemap
-        self.statemapinv  = statemapinv
-        self.actmap     = actmap
-        self.actmapinv  = actmapinv
-        self._readonly  = readonly
+        self._samples        = samples
+        self._statemap       = statemap
+        self._statemapinv    = statemapinv
+        self._actmap         = actmap
+        self._actmapinv      = actmapinv
+        self._readonly      = readonly
 
     def samples(self):
         """
         Returns an iterator over decision samples.
         """
-        return (s.map(self.decmap,self.expmap,self.actmap) \
-                    for s in self.samples.samples())
+        return (s.map(self._statemap,self._actmap) \
+                    for s in self._samples.samples())
         
     def initialsamples(self):
         """
         Returns samples of initial decision states.
         """
-        return (self.decmap(s) for s in self.samples.initialsamples())
+        return (self._statemap(s) for s in self._samples.initialsamples())
 
     def add_sample(self, decsample):
         """
         Adds a decision sample.
         """
         if not self._readonly:
-            s = decsample.map(self.decmapinv,self.expmapinv,self.actmapinv)
-            self.samples.add_dec(s)
+            s = decsample.map(self._statemapinv,self._actmapinv)
+            self._samples.add_dec(s)
         else:
             raise NotImplementedError('Cannot modify readonly view.')
         
@@ -368,8 +354,7 @@ class SampleView(Samples):
         Adds an initial state.
         """
         if not self._readonly:
-            self.samples.add_initial( \
-                        self.decmapinv(decstate))
+            self._samples.add_initial(self._statemapinv(decstate))
         else:
             raise NotImplementedError('Cannot modify readonly view.')                        
         
@@ -385,7 +370,7 @@ class SampleView(Samples):
         """
         raise NotImplementedError('Not supported.')
         
-    def copy(self,dec=True,exp=True,initial=True):
+    def copy(self,dec=True,initial=True):
         """
         Returns a copy of the samples that can be modified
         """

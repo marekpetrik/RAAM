@@ -12,6 +12,7 @@ import scipy as sp
 import itertools
 import raam
 import pickle
+import math
 from raam import features
 
 
@@ -41,7 +42,7 @@ class ConfigSimple:
         self.action_valuation_delta = np.diag(np.random.rand(len(self.product_types)))
         # action price - only applied when the product is purchased
         self.action_price = np.random.rand(len(self.action_types)) * 0
-        # replenishement probabilities
+        # replenishment probabilities
         self.replenishement_probabilities = sp.random.dirichlet(np.ones(len(self.product_types)))
         self.initial_inventory = np.ones(len(self.product_types)) * products 
         self.initial_inventory.flags.writeable = False
@@ -114,7 +115,9 @@ class Simulator(raam.Simulator):
 
     @property
     def discount(self):
-        return 0.95
+        # the sqrt is to compensate for the virtual step due to 
+        # separate decision and expectation states
+        return math.sqrt(0.95)
 
     def transition(self, state, action):
         """
