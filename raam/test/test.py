@@ -606,8 +606,13 @@ class TestAggregation(unittest.TestCase):
                 
         self.assertEqual(aggs, set(range(25)))
 
+from raam import implementable
 
 class TestImplementable(unittest.TestCase):
+
+    def setUp(self):
+        self.samplesstoch = examples.chain.simple_samples(7,0.75)
+        self.samplesstochd = features.DiscreteSampleView(self.samplesstoch)
 
     def test_construction(self):
         initial = np.ones(2) / 2
@@ -621,3 +626,14 @@ class TestImplementable(unittest.TestCase):
         rmdp = mdpi.get_robust()
         self.assertEqual(rmdp.state_count(),1)
 
+    
+    def test_opl_contruction(self):
+        mdp = craam.MDP(7, 0.9)
+        for s in self.samplesstochd.samples():
+            mdp.add_transition(s.statefrom, s.action, s.stateto, s.weight, s.reward)
+    
+        init = np.zeros(7)
+        init[3] = 1.0
+        observations = np.arange(7)
+        observations[6] = 5
+        implementable.create_opl_data("test", mdp, init, observations, 0.99, filename=None)

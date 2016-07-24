@@ -12,9 +12,9 @@ Usage:
 """
 
 import numpy as np
-
 import subprocess
 import json
+import io
 
 #%% Create OPL data file
 
@@ -31,7 +31,7 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
     ----------
     name : string
         Name of the problem
-    mdp : crobust.RoMDP
+    mdp : craam.MDP
         MDP specification with no robustness
     observations : array-like
         Observation index for each state
@@ -39,6 +39,7 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
         Discount factor
     filename : string, optional
         Name of the opl data output file
+        If None, the outputs the string
     action_decomposition : list of lists, optional
         If actions can be decomposed then for each action it lists the indexes
         of decomposed actions
@@ -49,7 +50,12 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
         Identifier of the problem (to check that the solution is for the same)
     """
 
-    with open(filename,"w") as f:
+    if filename is not None:
+        f = open(filename,"w")
+    else:
+        f = io.StringIO()
+    
+    try: 
         ident = str(random.randint(0,1e6))
 
         f.write('problemName="'+name+'";\n')
@@ -119,6 +125,8 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
             f.write('};\n')
             
         return ident
+    finally:
+        f.close()
 
 def solve_opl(model='milp.mod', data="milp_output.dat", result="solution.json", \
                 ident = None, oplrun_exec="oplrun", verbose=False):
