@@ -10,11 +10,12 @@ import random
 import numpy as np
 import itertools
 import json
+from operator import itemgetter
+import math
 
 import craam
 
 from raam import features
-from raam import crobust
 from raam import robust
 
 settings = {}
@@ -384,32 +385,32 @@ class RobustTests(unittest.TestCase):
         q = np.array([0.4, 0.3, 0.1, 0.2])
         z = np.array([1.0,2.0,5.0,4.0])
         t = 0
-        self.assertEquals(crobust.cworstcase_l1(z,q,t),q.dot(z))
+        self.assertEquals(craam.cworstcase_l1(z,q,t),q.dot(z))
         
         q = np.array([0.4, 0.3, 0.1, 0.2])
         z = np.array([1.0,2.0,5.0,4.0])
         t = 1
-        self.assertAlmostEqual(crobust.cworstcase_l1(z,q,t),1.1)        
+        self.assertAlmostEqual(craam.cworstcase_l1(z,q,t),1.1)        
         
         q = np.array([0.4, 0.3, 0.1, 0.2])
         z = np.array([1.0,2.0,5.0,4.0])
         t = 2
-        self.assertEquals(crobust.cworstcase_l1(z,q,t),np.min(z))
+        self.assertEquals(craam.cworstcase_l1(z,q,t),np.min(z))
         
         q = np.array([1.0,0.0])
         z = np.array([2.0,1.0])
         t = 0
-        self.assertEquals(crobust.cworstcase_l1(z,q,t),2)
+        self.assertEquals(craam.cworstcase_l1(z,q,t),2)
         
         q = np.array([1.0,0.0])
         z = np.array([2.0,1.0])
         t = 1
-        self.assertEquals(crobust.cworstcase_l1(z,q,t),1.5)
+        self.assertEquals(craam.cworstcase_l1(z,q,t),1.5)
         
         q = np.array([1.0,0.0])
         z = np.array([2.0,1.0])
         t = 2
-        self.assertEquals(crobust.cworstcase_l1(z,q,t),1)
+        self.assertEquals(craam.cworstcase_l1(z,q,t),1)
     
     def test_l1_worstcase_masked(self):
         z = np.ma.array([np.ma.masked,2,np.ma.masked,1,np.ma.masked])
@@ -441,9 +442,9 @@ class RobustTests(unittest.TestCase):
         actions = np.array((0,1))
         outcomes = np.array((0,0))
         
-        rmdp = crobust.RoMDP(states,0.99)
-        rmdp.from_matrices(transitions,rewards,actions,outcomes)
-        value,policy,residual,iterations,_ = rmdp.mpi_jac(1000)
+        rmdp = craam.MDP(states,0.99)
+        rmdp.from_matrices(transitions,rewards)
+        value,policy,residual,iterations = rmdp.mpi_jac(1000)
          
         target_value = [ 67.48585933,  67.6855307 ,  67.15995444,  67.33964064,
             67.35730334,  67.448749  ,  67.38176967,  67.65606086,
@@ -485,102 +486,6 @@ class RobustTests(unittest.TestCase):
         self.assertAlmostEqual(residual,0)
         
         
-from operator import itemgetter
-        
-@unittest.skip("todo")
-class RobustRecommender(unittest.TestCase):       
-    def setUp(self):
-        np.random.seed(0)
-        random.seed(0)
-        import copy
-        horizon = 200 
-        runs = 500
-        config = copy.copy(raam.examples.recommender.config2)
-        config['recommendcount'] = 1
-        config['objective'] = 'margin'
-        simulator = raam.examples.recommender.Recommender(config)
-    
-        policy_random = simulator.random_policy()
-        samples_random = simulator.simulate(horizon,policy_random,runs)
-        
-        decagg = robust.__ind__
-        expagg = features.IdCache()
-        self.result = robust.matrices(samples_random,decagg=decagg,expagg=expagg)
-        result = self.result
-        
-        self.statecount = self.result['dectoexp'].shape[0]
-        
-        self.rmdp = crobust.RoMDP(self.statecount,1.0)
-        self.rmdp.from_sample_matrices(result['dectoexp'], result['exptodec'], result['actions'], result['rewards'])
-        
-        self.v_robust = [ 5.20241692,  3.48411739,  6.29607251,  6.29607251, 3.7897281, 6.94864048, 0.        ]
-        self.v_robust_half = [  7.86077137,   9.05926647,   9.43518508,  12.21934149,  5.98868032,  13.08652546,   0.        ]
-        
-    def _check_vrobust(self,v):
-        for iv, ivr in zip(v, self.v_robust):
-            self.assertAlmostEqual(iv, ivr, 2)
-            
-    def _check_vrobust_half(self,v):
-        for iv, ivr in zip(v, self.v_robust_half):
-            self.assertAlmostEqual(iv, ivr, 2)            
-        
-    def test_many_iterations(self):
-        v = self.rmdp.vi_gs(1000)    
-        self._check_vrobust(v[0])
-        
-    def test_residual(self):
-        v = self.rmdp.vi_gs(10000, maxresidual=0.0001)
-        self._check_vrobust(v[0])
-    
-    def test_many_iterations_with_replace(self):
-        v = self.rmdp.vi_jac(1000)
-        self._check_vrobust(v[0])
-        
-    def test_residual_with_replace(self):
-        v = self.rmdp.vi_jac(10000, maxresidual=0.0001)
-        self._check_vrobust(v[0])
-    
-    def test_l1_worst(self):
-        self.rmdp.set_uniform_thresholds(2)
-        v = self.rmdp.vi_gs_l1(1000)
-        self._check_vrobust(v[0])
-    
-    def test_l1_worst_with_residual(self):
-        self.rmdp.set_uniform_thresholds(2)
-        v = self.rmdp.vi_gs_l1(10000, maxresidual=0.0001)
-        self._check_vrobust(v[0])
-    
-    def test_l1_worst_with_replace(self):
-        self.rmdp.set_uniform_thresholds(2)
-        v = self.rmdp.vi_jac_l1(1000)
-        self._check_vrobust(v[0])
-    
-    def test_l1_worst_with_residual_and_replace(self):
-        self.rmdp.set_uniform_thresholds(2)
-        v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001)
-        self._check_vrobust(v[0])
-        
-    def test_l1_half(self):
-        self.rmdp.set_uniform_thresholds(0.5)
-        v = self.rmdp.vi_gs_l1(1000)
-        self._check_vrobust_half(v[0])
-    
-    def test_l1_half_with_residual(self):
-        self.rmdp.set_uniform_thresholds(0.5)
-        v = self.rmdp.vi_gs_l1(10000, maxresidual=0.0001)
-        self._check_vrobust_half(v[0])
-    
-    def test_l1_half_with_replace(self):
-        self.rmdp.set_uniform_thresholds(0.5)
-        v = self.rmdp.vi_jac_l1(1000)
-        self._check_vrobust_half(v[0])
-    
-    def test_l1_half_with_residual_and_replace(self):
-        self.rmdp.set_uniform_thresholds(0.5)
-        v = self.rmdp.vi_jac_l1(10000, maxresidual=0.0001)
-        self._check_vrobust_half(v[0])        
-
-import math
 
 from raam.features import GridAggregation
 class TestAggregation(unittest.TestCase):
@@ -707,11 +612,12 @@ class TestImplementable(unittest.TestCase):
     def test_construction(self):
         initial = np.ones(2) / 2
         observations = np.zeros(2,dtype=int)
-        mdp = crobust.RoMDP(2,0.99)
-        mdp.add_transition_d(0,0,1,1.0,1.0);
-        mdp.add_transition_d(1,0,0,1.0,1.0);
+        mdp = craam.MDP(2,0.99)
+        mdp.add_transition(0,0,1,1.0,1.0);
+        mdp.add_transition(1,0,0,1.0,1.0);
 
-        mdpi = crobust.MDPIR(mdp,observations,initial)
+        mdpi = craam.MDPIR(mdp,observations,initial)
 
         rmdp = mdpi.get_robust()
         self.assertEqual(rmdp.state_count(),1)
+
