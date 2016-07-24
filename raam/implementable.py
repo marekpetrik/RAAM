@@ -42,13 +42,17 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
         If None, the outputs the string
     action_decomposition : list of lists, optional
         If actions can be decomposed then for each action it lists the indexes
-        of decomposed actions
+        of decomposed actions. 
         
     Returns
     -------
     ident : string
         Identifier of the problem (to check that the solution is for the same)
+    string_rep : string
+        Only if provided with filename=None, also returns OPL string representation
     """
+
+    ident = str(random.randint(0,1e6))
 
     if filename is not None:
         f = open(filename,"w")
@@ -56,8 +60,6 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
         f = io.StringIO()
     
     try: 
-        ident = str(random.randint(0,1e6))
-
         f.write('problemName="'+name+'";\n')
         f.write('discount='+str(discount)+';\n')
         f.write('upper_bound='+str(1/discount)+';\n')
@@ -124,9 +126,14 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
                 f.write('>')
             f.write('};\n')
             
-        return ident
+        if filename is not None:
+            return ident
+        else:
+            return ident, f.getvalue()
+
     finally:
         f.close()
+
 
 def solve_opl(model='milp.mod', data="milp_output.dat", result="solution.json", \
                 ident = None, oplrun_exec="oplrun", verbose=False):

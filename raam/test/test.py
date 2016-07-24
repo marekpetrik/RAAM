@@ -636,4 +636,5 @@ class TestImplementable(unittest.TestCase):
         init[3] = 1.0
         observations = np.arange(7)
         observations[6] = 5
-        implementable.create_opl_data("test", mdp, init, observations, 0.99, filename=None)
+        _, string = implementable.create_opl_data("test", mdp, init, observations, 0.99, filename=None)
+        self.assertEqual(len(string), 691)
