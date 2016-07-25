@@ -29,9 +29,13 @@ install:
 script:
     - export CC=/usr/bin/gcc-4.9
     - export CXX=/usr/bin/g++-4.9
+    - git clone --depth 1 https://github.com/marekpetrik/CRAAM.git
     - cd craam
     - ../cmake-3.3.2-Linux-x86_64/bin/cmake . 
     - ../cmake-3.3.2-Linux-x86_64/bin/cmake --build . --target craam
+    - cd python 
+    - python3 setup.py install
+    - cd ..
     - cd ..
     - python3 setup.py install 
     - mkdir test_dir
