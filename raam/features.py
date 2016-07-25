@@ -13,67 +13,6 @@ import raam.samples
 from operator import itemgetter
 
 
-def apply_dec(samples,features):
-    """
-    Returns new samples with the given features applied to decision states
-    
-    Parameters
-    ----------
-    samples :` raam.Samples
-        Source of the samples
-    features : function (list -> list)
-        Function that computes feature values
-
-    Returns
-    -------
-    out : raam.Samples
-        Samples after the applied feature map
-    """
-    nsamples = raam.samples.MemSamples()
-    
-    for d in samples.decsamples():
-        dd = copy.copy(d)
-        dd.decStateFrom = features(dd.decStateFrom) 
-        nsamples.add_dec(dd)
-
-    for e in samples.expsamples():
-        ee = copy.copy(e)
-        ee.decStateTo = features(e.decStateTo) 
-        nsamples.add_exp(ee)
-
-    return nsamples
-
-def apply_exp(samples,features):
-    """
-    Returns new samples with the given features applied to expectation states
-
-    Parameters
-    ----------
-    samples : raam.Samples
-        Source of the samples
-    features : function (list -> list)
-        Function that computes feature values
-
-    Returns
-    -------
-    out : raam.Samples
-        Samples after the applied feature map
-    """
-    nsamples = raam.samples.MemSamples()
-    
-    for d in samples.decsamples():
-        dd = copy.copy(d)
-        dd.expStateTo = features(d.expStateTo) 
-        nsamples.add_dec(dd)
-
-    expStates = []
-    for e in samples.expsamples():
-        ee = copy.copy(e)
-        ee.expStateFrom = features(e.expStateFrom) 
-        nsamples.add_exp(ee)
-    
-    return nsamples
-
 def gaussian(centerpoints):
     """ Gaussian features """
     return (lambda p: [ math.exp(- np.linalg.norm(np.array(p)-px) ** 2 ) for px in centerpoints ] + [1] )
@@ -107,6 +46,8 @@ import bisect
 from operator import mul
 from functools import reduce
 from itertools import product
+from collections import Sequence
+from copy import copy
 
 class GridAggregation:
     """
@@ -116,6 +57,17 @@ class GridAggregation:
     The first dimension is the most significant one
     
     Use ``len(x)'' to determine the number of states
+
+    Parameters
+    ----------
+    limits : list
+        List of min and max limits for each dimension
+    ticks : list
+        Resolution of each dimension. If each item is an integer
+        then a linear space with the upper an lower bound is used
+        as boundaries. If it is a list, then the provided numbers are 
+        used as boundaries. In that case, the 
+    
 
     Examples
     --------
@@ -129,22 +81,33 @@ class GridAggregation:
     """
 
     def __init__(self, limits, ticks):
-        """
-        Initializes the grid
-        
-        Parameters
-        ----------
-        limits : list
-            List of min and max limits for each dimension
-        ticks : list
-            Resolution of each dimension
-        
-        """
         # the spacing for each dimension, includes both the first and the last points
         if len(ticks) != len(limits):
             raise ValueError('Limits and ticks must have the same length.')
         self._limits = limits
-        self._grids = tuple(np.linspace(d[0],d[1],t+1) for t,d in zip(ticks,limits) )
+
+        # compute boundaries of cells
+        self._grids = []
+        for t,d in zip(ticks,limits):
+            # check if the ticks is a sequence (and use then directly or a number of ticks)
+            if isinstance(t, Sequence):
+                # make sure that the upper and lower bounds match
+                if t[0] != d[0]:
+                    raise ValueError("Ticks lower bound does not match limits.")
+                if t[-1] != d[1]:
+                    raise ValueError("Ticks upper bound does not match limits.")
+
+                # make sure that the sequence is sorted
+                if any(a >= b for one,two in zip(t[:-1],t[1,:])):
+                    raise ValueError("Ticks sequence must be strictly increasing.")
+
+                self._grids.append(copy(t))
+            else:
+                self._grids.append(np.linspace(d[0],d[1],t+1))
+
+        self._grids = tuple(self._grids)
+
+        # compute the total number of states
         self._length = reduce(mul, (len(g) - 1 for g in self._grids))
     
     
