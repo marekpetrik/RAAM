@@ -78,6 +78,10 @@ class GridAggregation:
     A one-dimensional grid can be constructed as:
     
     >>> GridAggregation( ((-6,+6),), (10,) )
+
+    See Also
+    --------
+    numpy.digitize for a 1-dimensional version of the method
     """
 
     def __init__(self, limits, ticks):
@@ -208,8 +212,9 @@ class GridAggregation:
         Parameters
         ----------
         x : list, array
-            An array of values that correspond to the dimension of the aggregation
-        y : list, array with length equal to the number of aggregates
+            An array of values that can be discretized
+        y : list, array 
+            A function defined for every bin of the aggregation (e.g. a value function)
         
         Returns
         -------
