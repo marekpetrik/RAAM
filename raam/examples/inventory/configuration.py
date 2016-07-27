@@ -78,6 +78,8 @@ def construct_massdata(degrade):
     """
     Returns a problem definition on what is described in the experimental 
     section of the paper
+
+    This uses a simple uniform quantization of energy prices
     
     Paramaters
     ----------
@@ -143,7 +145,7 @@ def construct_massdata(degrade):
         "initial_inventory" : 0.5,
         "degradation" : degradation,
         "capacity_cost" : 20000,
-        "change_capacity" : True   # assume that the capacity does not change
+        "change_capacity" : True   
         }
         
     return configuration

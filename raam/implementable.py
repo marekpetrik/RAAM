@@ -91,7 +91,7 @@ def create_opl_data(name, mdp, p0, observations, discount, filename="milp_output
         first = True
         for s in range(mdp.state_count()):
             for a in range(mdp.action_count(s)):
-                for ts, prob, rew in zip(mdp.get_toids(s,a,0), mdp.get_probabilities(s,a,0), mdp.get_rewards(s,a,0)):
+                for ts, prob, rew in zip(mdp.get_toids(s,a), mdp.get_probabilities(s,a), mdp.get_rewards(s,a)):
                     if first:
                         f.write('<')
                         first = False

@@ -1,11 +1,8 @@
 import numpy as np
-import scipy as sp
 import itertools
 import raam
 import pickle
 from raam import features
-
-epsilon = 1e-10
 
 def degradation(fun,charge,discharge):
     """
@@ -65,16 +62,10 @@ class Simulator(raam.Simulator):
     
     The initial state is generated from an expectation state 
     
-    Decision state (tuple): 
+    State (tuple): 
         - inventory
         - capacity
         - priceindex 
-    
-    Expectation state: 
-        - inventory
-        - capacity
-        - priceindex
-        - reward
     
     Action: charge change
         This is not an index but an absolute value of the change in charge
@@ -85,19 +76,22 @@ class Simulator(raam.Simulator):
         Configuration. See DefaultConfiguration for an example
     discount : float, optional
         Discount factor
-    action_step : float, optional
-        Discretization step for actions. This is an absolute number and should
-        scale with the size of the storage.
+    action_cnt : int, optional
+        Number of ticks for discretizing actions.
+    inventory_cnt : int, optional
+        Number of ticks for discretizing inventory states. 
+    capacity_cnt : int, optional
+        Discretization set for storage capacity states. 
+        This step must be fine enough to capture the small
+        change in capacities
     """
 
-    def __init__(self,config,discount=0.9999,action_step=0.05):
-        """ 
-        If no filename and no configuration are provided, 
-        then the configuration is created automatically 
-        """
-        
+    def __init__(self,config,discount=0.9999,action_cnt=20,inventory_cnt=100,\
+                    capacity_step=300):
         self._discount = discount
-        self._action_step = action_step
+        self._action_cnt = action_cnt
+        self._inventory_cnt = inventory_cnt
+        self._capacity_cnt = capacity_cnt
         
         self.degradation = degradation(**config['degradation'])
         self.initial_capacity = config['initial_capacity']
@@ -107,6 +101,10 @@ class Simulator(raam.Simulator):
         self.capacity_cost = config['capacity_cost']
         self.change_capacity = config['change_capacity']
         self.initial_inventory = config['initial_inventory']
+
+        # state and the distributions
+        self._all_states = None
+        self._initial_distribution = None
 
         assert np.all(np.array(self.price_buy) >= 0)
         assert np.all(np.array(self.price_sell) >= 0)
@@ -122,13 +120,117 @@ class Simulator(raam.Simulator):
     def discount(self):
         return self._discount
 
-    def transition_dec(self,decstate,action):
+    def all_states(self):
+        """
+        Returns all states (quantized according to the parameters provided in the constructor)
+
+        There is no iteration over capacities if self.change_capacity = False and it is 
+        fixed to be 0.
+
+        Returns
+        -------
+        out : np.ndarray
+            List of all states
+        """
+        
+        # lazy initialization
+        if self._all_states is None:
+            inventories = np.linspace(0,self.initial_capacity,self._inventory_step)
+
+            capacities = np.linspace(0,self.initial_capacity,self._capacity_step) \
+                            if self.change_capacity\
+                            else np.array([self.initial_capacity])
+
+            # make sure that the initial capacity is the first one
+            capacities = capacities[::-1]
+
+            # construct states
+            prices = np.arange(len(self.price_buy))
+            
+            states = itertools.product(inventories, capacities, prices)
+
+            self._all_states = np.array(list(states))
+    
+        return self._all_states
+
+    def initial_distribution(self):
+        """
+        Returns initial distributions over states returned be all_states
+        
+        Returns
+        -------
+        out : np.ndarray
+            Initial distribution
+        """
+
+        # lazy initialization
+        if self._initial_distribution is None:
+            from scipy import cluster
+            
+            allstates = self.all_states()
+            initialstate = self.initstates().__next__()
+
+            init_index = cluster.vq.vq(initialstate, all_states)[0][0]
+
+            distribution = np.zeros(len(allstates))
+            distribution[init_index] = 1.0
+
+            self._initial_distribution = distribution
+
+        return self._initial_distribution
+
+    def all_transitions(self, decstate, action):
+        """
+        Returns all transitions and probabilities for the given state and action.
+
+        Returns
+        -------
+        out : sequence
+            Sequence of tuples: (nextstate, probability, reward)
+        """
+
+        inventory, capacity, priceindex = decstate
+        assert inventory >= 0 and inventory <= capacity
+        
+        # determine buy and sell prices
+        pricesell = self.price_sell[priceindex]
+        pricebuy = self.price_buy[priceindex]
+        
+        # trim action based on the current inventory
+        action = max(action, - inventory)
+        action = min(action, capacity - inventory)
+        
+        # update the next inventory based on the action
+        ninventory = inventory + action
+        
+        # compute capacity loss
+        capacity_loss = self.degradation(inventory / capacity, ninventory / capacity) * capacity
+        assert capacity_loss >= -1e-10, 'Cannot have negative capacity loss' 
+
+        if self.change_capacity:
+            ncapacity = max(0,capacity - capacity_loss)
+            ninventory = min(ninventory, ncapacity)
+        else:
+            ncapacity = capacity
+
+        # compute the reward for the transition
+        reward = - (pricebuy if action >= 0 else pricesell) * action
+        reward -= capacity_loss * self.capacity_cost
+
+        # sample the next price index
+        for npriceindex, probability in enumerate(self.price_probabilities[priceindex,:]):
+            yield ((ninventory,ncapacity,npriceindex),probability,reward)
+
+    def transition(self,decstate,action):
         """ 
-        Represents a transition from the deterministic state to an expectation state.
+        Represents a transition from a state.
+
+        Charging over the available capacity, or discharging below empty is not possible.
+        Any action that attempts to do that is automatically limited to the capacity.
 
         Parameters
         ----------
-        decstate : decision state
+        decstate : state
             inventory,capacity,priceindex
         action : float
             change in charge (this is a float value, not the index)
@@ -138,77 +240,62 @@ class Simulator(raam.Simulator):
         out : expectation state
             inventory,capacity,reward
         """
+        #TODO: replace by a call to all_transitions
         inventory, capacity, priceindex = decstate
+        assert inventory >= 0 and inventory <= capacity
         
+        # determine buy and sell prices
         pricesell = self.price_sell[priceindex]
         pricebuy = self.price_buy[priceindex]
         
-        assert inventory >= 0
-        assert inventory <= capacity
-        
+        # trim action based on the current inventory
         action = max(action, - inventory)
         action = min(action, capacity - inventory)
         
+        # update the next inventory based on the action
         ninventory = inventory + action
+        
+        # compute capacity loss
         capacity_loss = self.degradation(inventory / capacity, ninventory / capacity) * capacity
-        assert capacity_loss >= -1e-10
+        assert capacity_loss >= -1e-10, 'Cannot have negative capacity loss' 
+
         if self.change_capacity:
             ncapacity = max(0,capacity - capacity_loss)
             ninventory = min(ninventory, ncapacity)
         else:
             ncapacity = capacity
 
+        # compute the reward for the transition
         reward = - (pricebuy if action >= 0 else pricesell) * action
         reward -= capacity_loss * self.capacity_cost
-        return (ninventory,ncapacity,priceindex,reward)
 
-    def transition_exp(self,expstate):
-        """ 
-        Transition from an expectation state to a decision state
-
-        Parameters
-        ----------
-        expstate : expectation state
-
-        Returns
-        -------
-        reward : float
-        decision state : object
-        """
-        inventory,capacity,priceindex,reward = expstate
-        
-        assert inventory >= 0
-        assert inventory <= capacity
-
-        pricecount = len(self.price_probabilities[priceindex,:])
-
-        priceindex = np.random.choice(\
+        # sample the next price index
+        pricecount = self.price_probabilities.shape[1]
+        npriceindex = np.random.choice(\
             np.arange(pricecount,dtype=int), \
             p=self.price_probabilities[priceindex,:])
-        
-        return (reward,(inventory,capacity,priceindex))
+
+        return (reward,(ninventory,ncapacity,npriceindex))
 
     def actions(self,decstate):
         """
         List of applicable actions in the state
         """
         inventory, capacity, _ = decstate
-        return np.arange(-inventory, capacity - inventory + epsilon, self._action_step)
+        return np.linspace(-inventory, capacity - inventory, self._action_cnt)
 
     def all_actions(self):
         """
         List of all possible actions (charge and discharge capacities)
         """
-        return np.arange(-self.initial_capacity, self.initial_capacity + epsilon, \
-                            self._action_step)
-
-    def stateiterator(self):
-        expstate = (self.initial_inventory,self.initial_capacity,0,0)
-        while True:
-            yield self.transition_exp(expstate)[1]
+        return np.arange(-self.initial_capacity, self.initial_capacity, \
+                            self._action_cnt)
 
     def initstates(self):
-        return self.stateiterator()
+        """ The initial state is given by the configuration and the 1st state of the 
+        price process. """
+        itertools.repeat( (self.initial_inventory,self.initial_capacity,0) )
+
 
     def price_levels(self):
         """ Returns the number of price states in the Markov model """
@@ -266,8 +353,6 @@ def threshold_policy(lowers, uppers, simulator):
 import math
 import random
  
-_epsilon = 1e-6
-
 def _eval_dimchange(sim,lowers,uppers,dim,l,u,horizon,runs):
     """ Evaluates the dimension change impact """
     dim_lowers = lowers.copy()
@@ -328,6 +413,8 @@ def optimize_independently(sim,step=0.1,horizon=600,runs=5):
     that this method actually computes the optimal policy        
     """
     
+    epsilon = 1e-6                  # small value to deal with numertical issues
+
     # copy the lower and upper bounds
     lowers = 0.5*np.ones(len(sim.price_buy))    # lower thresholds
     uppers = 0.5*np.ones(len(sim.price_buy))     # upper thresholds

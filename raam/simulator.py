@@ -495,3 +495,64 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
         
     return policy
  
+def construct_mdp(sim, discount):
+    """
+    Uses the simulator `sim` to construct an MDP model. 
+    
+    Simulator can provide any hashable states. States in the MDP model are
+    identified by an integral index based on the order returned 
+    by `sim.all_states`. Actions are also indexed sequentially based on the
+    order returned by `sim.actions`.
+
+    The simulator `sim` must support a function: 
+        - `all_transitions`, which takes a state and action and generates a sequence of:
+            `(nextstate,probability,reward), (nextstate, probability, reward), ....`
+        - `all_states`, which returns a sequence of all possible states in the
+                        problem and the initial probability in for that state:
+                        `(s,p0), (s,p0), ...`
+        - `initial_distribution`, which returns the initial distribution for all 
+                                all states returned be `all_states`
+
+    Parameters
+    ----------
+    sim : raam.Simulator
+        Needs functions: all_transitions and all_states 
+    discount : float 
+        Discount factor
+        
+    Returns
+    -------
+    mdp : craam.MDP
+        Resulting MDP
+    p0 : array like
+        Initial distribution
+    all_states : list
+        List of all states
+    """
+
+    allstates = sim.all_states()
+    initprobs = sim.initial_distribution()
+
+    if abs(np.sum(initprobs) - 1) > 1e-5:
+        raise ValueError('Initial distribution does not sum to one')
+    
+    state2id = {s:i for i,s in enumerate(allstates)}
+    
+    mdp = craam.MDP(len(allstates),discount)
+    
+    # associate states with ids
+    for fstateid,fstate in enumerate(allstates):
+        
+        if sim.end_condition(fstate):
+            # do not add any transition or actions for the terminal state
+            # such state is automatically then treated as terminal
+            continue
+
+        for actionid, action in enumerate(sim.actions(fstate)):
+            for nstate, prob, rew in sim.all_transitions(fstate, action):
+                nstateid = state2id[nstate]
+                mdp.add_transition(fstateid,actionid,nstateid,prob,rew)            
+    
+    p0 = np.array(initprobs)
+    
+    return mdp, p0
