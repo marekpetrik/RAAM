@@ -51,12 +51,15 @@ from copy import copy
 
 class GridAggregation:
     """
-    Class that handles state aggregation. Each aggregate state is *closed* on the
-    lower bound and *open* on the upper bound.
+    Class that handles state aggregation. Each aggregate state is 
+    *closed* on the lower bound and *open* on the upper bound.
     
-    The first dimension is the most significant one
+    The first dimension is the most significant one.
     
     Use ``len(x)'' to determine the number of states
+
+    Internally, each grid marks both lower an upper bounds on 
+    each cell for every dimension.
 
     Parameters
     ----------
@@ -68,7 +71,6 @@ class GridAggregation:
         as boundaries. If it is a list, then the provided numbers are 
         used as boundaries. In that case, the 
     
-
     Examples
     --------
     A two-dimensional grid can be constructed as:
@@ -81,7 +83,8 @@ class GridAggregation:
 
     See Also
     --------
-    numpy.digitize for a 1-dimensional version of the method
+    numpy.digitize for a 1-dimensional version of the method. numpy.digitize
+    can be much slower mostly when there are many aggregate.
     """
 
     def __init__(self, limits, ticks):
@@ -105,7 +108,7 @@ class GridAggregation:
                 if any(a >= b for one,two in zip(t[:-1],t[1,:])):
                     raise ValueError("Ticks sequence must be strictly increasing.")
 
-                self._grids.append(copy(t))
+                self._grids.append(list(t))
             else:
                 self._grids.append(np.linspace(d[0],d[1],t+1))
 
@@ -114,7 +117,27 @@ class GridAggregation:
         # compute the total number of states
         self._length = reduce(mul, (len(g) - 1 for g in self._grids))
     
+    def _centers(self, dim, vals):
+        """  Internal method to generate the centers by recursion 
+            dim - current dimension
+            vals - current values for the earlier dimensions
+        """
+        for i in range(len(self._grids[dim]) - 1):
+            g = (self._grids[dim][i] + self._grids[dim][i+1]) / 2
+
+            if dim < len(self._grids) - 1:
+                yield from self._centers(dim+1, vals + (g,))
+            else:
+                yield vals + (g,)
+
+ 
+    def centers(self):
+        """
+        Returns a sequence of enters, one for each aggregate state
+        """
+        yield from self._centers(0, tuple())
     
+
     def classify(self,state,range_error=False):
         """
         Computes the appropriate class for the grid clustering
@@ -195,7 +218,6 @@ class GridAggregation:
         out : iterator
             A product iterators that consists of arrays of states
         """
-        
         if limits is None:
             limits = self._limits
 

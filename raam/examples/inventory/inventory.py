@@ -3,6 +3,7 @@ import itertools
 import raam
 import pickle
 from raam import features
+from scipy import cluster
 
 def degradation(fun,charge,discharge):
     """
@@ -87,7 +88,7 @@ class Simulator(raam.Simulator):
     """
 
     def __init__(self,config,discount=0.9999,action_cnt=20,inventory_cnt=100,\
-                    capacity_step=300):
+                    capacity_cnt=100):
         self._discount = discount
         self._action_cnt = action_cnt
         self._inventory_cnt = inventory_cnt
@@ -120,12 +121,26 @@ class Simulator(raam.Simulator):
     def discount(self):
         return self._discount
 
+    def get_stateindex(self, decstate):
+        """
+        Finds the index of the state in the list returned by all_states
+        """
+        # lazy initialization
+        if self._all_states is None:
+            self.all_states()
+
+        return self._state_aggregation.classify(decstate)
+
+
     def all_states(self):
         """
         Returns all states (quantized according to the parameters provided in the constructor)
 
         There is no iteration over capacities if self.change_capacity = False and it is 
         fixed to be 0.
+
+        Important: Use self.get_stateindex() to get index of a state instead of searching this list.
+        It is much more efficient.
 
         Returns
         -------
@@ -135,21 +150,21 @@ class Simulator(raam.Simulator):
         
         # lazy initialization
         if self._all_states is None:
-            inventories = np.linspace(0,self.initial_capacity,self._inventory_step)
 
-            capacities = np.linspace(0,self.initial_capacity,self._capacity_step) \
-                            if self.change_capacity\
-                            else np.array([self.initial_capacity])
+            pricecount = len(self.price_buy)
 
-            # make sure that the initial capacity is the first one
-            capacities = capacities[::-1]
+            # if the capacity does not chnage, then aggregate the capacity dimension to only one value
+            if self.change_capacity:
+                # make sure that the centers of price clusters are integer numbers
+                self._state_aggregation = raam.features.GridAggregation(\
+                         ((0,self.initial_capacity), (0,self.initial_capacity), (-0.5,pricecount-0.5)), \
+                         (self._inventory_cnt, self._capacity_cnt, pricecount)  )
+            else:
+                self._state_aggregation = raam.features.GridAggregation(\
+                         ((0,self.initial_capacity), (self.initial_capacity-0.1,self.initial_capacity+0.1), (-0.5,pricecount-0.5)), \
+                         (self._inventory_cnt, 1, pricecount)  )
 
-            # construct states
-            prices = np.arange(len(self.price_buy))
-            
-            states = itertools.product(inventories, capacities, prices)
-
-            self._all_states = np.array(list(states))
+            self._all_states = list(self._state_aggregation.centers())
     
         return self._all_states
 
@@ -170,7 +185,7 @@ class Simulator(raam.Simulator):
             allstates = self.all_states()
             initialstate = self.initstates().__next__()
 
-            init_index = cluster.vq.vq(initialstate, all_states)[0][0]
+            init_index = self.get_stateindex(initialstate)
 
             distribution = np.zeros(len(allstates))
             distribution[init_index] = 1.0
@@ -178,19 +193,25 @@ class Simulator(raam.Simulator):
             self._initial_distribution = distribution
 
         return self._initial_distribution
+    
 
-    def all_transitions(self, decstate, action):
+    def all_transitions_continuous(self, decstate, action):
         """
         Returns all transitions and probabilities for the given state and action.
 
+        The returned states are continuous and are not quantized according to 
+        self._all_states()
+
         Returns
         -------
-        out : sequence
+        out : list
             Sequence of tuples: (nextstate, probability, reward)
         """
 
         inventory, capacity, priceindex = decstate
-        assert inventory >= 0 and inventory <= capacity
+        priceindex = int(priceindex)
+
+        assert(inventory >= 0 and inventory <= capacity)
         
         # determine buy and sell prices
         pricesell = self.price_sell[priceindex]
@@ -218,8 +239,39 @@ class Simulator(raam.Simulator):
         reward -= capacity_loss * self.capacity_cost
 
         # sample the next price index
-        for npriceindex, probability in enumerate(self.price_probabilities[priceindex,:]):
-            yield ((ninventory,ncapacity,npriceindex),probability,reward)
+        return (((ninventory,ncapacity,npriceindex),probability,reward) \
+                for npriceindex, probability in \
+                    enumerate(self.price_probabilities[priceindex,:]) if probability > 0)
+
+    def all_transitions(self, stateindex, actionindex):
+        """
+        Returns all transitions and probabilities for the given state and action.
+
+        The returned states are continuous and are not quantized according to 
+        self._all_states()
+
+        Parameters
+        ----------
+        stateindex : int
+            Index of the state in the list returned by all_states
+        actionindex : int
+            Index of the action in the list returned by actions
+
+        Returns
+        -------
+        out : sequence
+            Sequence of tuples: (nextstate, probability, reward)
+        """
+        allstates = self.all_states()
+        decstate = allstates[stateindex]
+
+        allactions = self.actions(decstate)
+        action = allactions[actionindex]
+
+        # map transitions to the state indexes
+        return [(self.get_stateindex(s),p,r) 
+            for s,p,r in 
+                self.all_transitions_continuous(decstate, action)]
 
     def transition(self,decstate,action):
         """ 
@@ -294,8 +346,7 @@ class Simulator(raam.Simulator):
     def initstates(self):
         """ The initial state is given by the configuration and the 1st state of the 
         price process. """
-        itertools.repeat( (self.initial_inventory,self.initial_capacity,0) )
-
+        return itertools.repeat( (self.initial_inventory,self.initial_capacity,0) )
 
     def price_levels(self):
         """ Returns the number of price states in the Markov model """
@@ -499,87 +550,3 @@ def plot_degradation(degrad, ex_inventories = [0.1,0.5,0.9],delta=None):
     pp.legend(loc=9)
     pp.grid()
 
-
-## End to end construction helper functions
-
-def makesimulator(discretization,discount,action_step=0.1):
-    """
-    Constructs an inventory simulator and helper functions to simplify the 
-    construction of the sampled MDP. The prices are constructed using the 
-    martingale price evolution.
-    
-    The inventory level is discretized according to the provided parameter, but 
-    the discretization happens after simulation just for the samples.
-
-    Parameters
-    ----------
-    discretization : int
-        Number of discrete inventory levels 
-    
-    Returns
-    -------
-    sim : raam.Simulator
-        Simulation object
-    create_srmdp : function
-        Function that creates an srmdp from the samples
-    create_policy : function
-        Function that creates a function policy from the result vector
-    """
-    
-    from raam import crobust
-    
-    epsilon = 1e-6                  # small value to deal with numertical issues
-    
-    # problem configuration
-    config = raam.examples.inventory.configuration.construct_martingale(np.arange(5), 5)
-    config['change_capacity'] = True        # updates capacity of inventory (degradation)
-    sim = raam.examples.inventory.Simulator(config,action_step=action_step,discount=discount)
-    
-    # construct the set of possible actions and map them to indexes
-    all_actions = sim.all_actions()
-    
-    def decmap(s):
-        soc,capacity,priceindex = s
-        assert type(priceindex) == int or type(priceindex) == np.int64
-        return (soc,priceindex)
-        
-    def expmap(s):
-        soc,capacity,priceindex,reward = s
-        return (soc,capacity,reward)
-    
-    #** for narrow samples
-    # decision state: soc, priceindex
-    decagg_big = raam.features.GridAggregation( \
-                        ((0,config['initial_capacity']+epsilon), (0,config['price_sell'].shape[0])),\
-                        (discretization, config['price_sell'].shape[0]) )
-    
-    # expectation state: soc, priceindex, reward 
-    expagg = raam.features.GridAggregation( \
-                        ((0,config['initial_capacity']+epsilon), (0,config['price_sell'].shape[0]), (-5,5)), \
-                        (3*discretization, config['price_sell'].shape[0], 200) )
-    
-    # assign an index to a decision states
-    dab = lambda x: decagg_big.classify(x,True)     
-    # assign an index to an expectation state
-    ea = lambda x: expagg.classify(x,True)
-    # represents the individual states (e.g. for computing worst case or best case solutions)
-    das = lambda x: 0
-    # represents individual expectation states
-    eas = lambda x: 0
-    # aggregations of actions
-    aa = lambda x : np.argmin(np.abs(all_actions - x))
-
-    # a helper function that constructs SRMDP from the provided samples
-    def create_srmdp(samples):
-        narrow_samples = raam.samples.SampleView(samples,decmap=decmap,
-                    expmap=expmap, actmap=raam.identity)
-        srmdp = crobust.SRoMDP(0,sim.discount)
-        srmdp.from_samples(narrow_samples,dab,das,ea,eas,aa)
-        return srmdp
-        
-    def create_policy(srmdp, policy_vec):
-        policy_vec_dec = srmdp.decpolicy(len(decagg_big), policy_vec)
-        policy = raam.vec2policy(policy_vec_dec, all_actions, lambda x: dab(decmap(x)),0)
-        return policy
-        
-    return sim, create_srmdp, create_policy

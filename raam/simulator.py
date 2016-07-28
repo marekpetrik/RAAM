@@ -317,7 +317,6 @@ class Simulator(metaclass=abc.ABCMeta):
         out : function(state -> action)
             A uniformly random policy that is greedy with respect to the provided 
             value function.
-    
         """
         if actionset is None:
             def policy(s): 
@@ -495,7 +494,7 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
         
     return policy
  
-def construct_mdp(sim, discount):
+def construct_mdp(sim, discount, show_progress=False):
     """
     Uses the simulator `sim` to construct an MDP model. 
     
@@ -504,14 +503,19 @@ def construct_mdp(sim, discount):
     by `sim.all_states`. Actions are also indexed sequentially based on the
     order returned by `sim.actions`.
 
+    The provided simulator should inherit from SimulatorConstructible
+
     The simulator `sim` must support a function: 
-        - `all_transitions`, which takes a state and action and generates a sequence of:
-            `(nextstate,probability,reward), (nextstate, probability, reward), ....`
-        - `all_states`, which returns a sequence of all possible states in the
-                        problem and the initial probability in for that state:
-                        `(s,p0), (s,p0), ...`
-        - `initial_distribution`, which returns the initial distribution for all 
-                                all states returned be `all_states`
+
+    - `all_transitions`, which takes a state index (in sim.all_states) 
+        and action index (in sim.actions(state)) and generates a sequence of:
+        `(nextstate,probability,reward)`, 
+        `(nextstate, probability, reward)`, ....
+    - `all_states`, which returns a sequence of all possible states in the
+        problem and the initial probability in for that state:
+        `(s,p0)`, `(s,p0)`, ...
+    - `initial_distribution`, which returns the initial distribution for all 
+        all states returned be `all_states`
 
     Parameters
     ----------
@@ -519,6 +523,8 @@ def construct_mdp(sim, discount):
         Needs functions: all_transitions and all_states 
     discount : float 
         Discount factor
+    show_progress : bool, optional
+        Shows progress. Requires tqdm.
         
     Returns
     -------
@@ -528,31 +534,39 @@ def construct_mdp(sim, discount):
         Initial distribution
     all_states : list
         List of all states
+    
+    Notes
+    -----
+    Requires craam
     """
+    import craam
 
     allstates = sim.all_states()
-    initprobs = sim.initial_distribution()
-
-    if abs(np.sum(initprobs) - 1) > 1e-5:
-        raise ValueError('Initial distribution does not sum to one')
-    
-    state2id = {s:i for i,s in enumerate(allstates)}
-    
     mdp = craam.MDP(len(allstates),discount)
     
+    # used to wrap the counter to enable progress reporting
+    statecounter = list(enumerate(allstates))
+    
+    if show_progress:
+        try:
+            from tqdm import tqdm
+            statecounter = tqdm(statecounter)
+        except Exception as e:
+            import warnings
+            warnings.warn('Importing tqdm failed, not showing progress')
+    
     # associate states with ids
-    for fstateid,fstate in enumerate(allstates):
+    for fstateid,fstate in statecounter:
         
+        # do not add any transition or actions for the terminal state
         if sim.end_condition(fstate):
-            # do not add any transition or actions for the terminal state
-            # such state is automatically then treated as terminal
+            # state with no transitions is a terminal state
             continue
 
         for actionid, action in enumerate(sim.actions(fstate)):
-            for nstate, prob, rew in sim.all_transitions(fstate, action):
-                nstateid = state2id[nstate]
+            for nstateid, prob, rew in sim.all_transitions(fstateid, actionid):
                 mdp.add_transition(fstateid,actionid,nstateid,prob,rew)            
     
-    p0 = np.array(initprobs)
+    p0 = sim.initial_distribution()
     
     return mdp, p0

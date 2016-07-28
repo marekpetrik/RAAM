@@ -286,11 +286,6 @@ class TestPrecise(unittest.TestCase):
             for a in actions:
                 rm.set_distribution(s,a,distributions[a][s,:])
         
-        #import pprint
-        #import json
-        #pprint.pprint(json.loads(rm.to_json()))
-        
-        
         rm.set_uniform_thresholds(0)
         valuefunction,_,_,_,_  = rm.vi_gs(200)
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
@@ -606,6 +601,11 @@ class TestAggregation(unittest.TestCase):
                 
         self.assertEqual(aggs, set(range(25)))
 
+    def test_center_generation(self):
+        ag = raam.features.GridAggregation(((-3,3),(5,6) ), (2,3) )         
+        ind = [ag.classify(cc) for cc in ag.centers()]
+        self.assertEqual(ind, list(range(6)))
+
 from raam import implementable
 
 class TestImplementable(unittest.TestCase):
@@ -638,3 +638,40 @@ class TestImplementable(unittest.TestCase):
         observations[6] = 5
         _, string = implementable.create_opl_data("test", mdp, init, observations, 0.99, filename=None)
         self.assertEqual(len(string), 691)
+
+
+class TestMDPConstruction(unittest.TestCase):
+    
+    def test_construct_inventory(self):
+
+        import raam
+        from raam import examples
+        import numpy as np
+
+        # Test simulator
+
+        pricecount = 20
+        actioncount = 5
+        inventorycount = 20
+
+        conf = examples.inventory.configuration.construct_martingale(np.arange(pricecount), 6)
+        conf['change_capacity'] = False
+
+        sim = examples.inventory.Simulator(conf, action_cnt=actioncount, inventory_cnt=inventorycount)
+
+        # construct mdp
+
+        allstates = sim.all_states()
+
+        mdp,p0 = raam.simulator.construct_mdp(sim, 0.9, show_progress=False)
+         
+        # solve mdp
+
+        value, policy, residual, iters = mdp.mpi_jac(1000)
+
+        self.assertEqual(value[0], 6.5167692414406195)
+        self.assertEqual(value[-1], 21.827503231912761)
+
+        self.assertEqual(policy[0], 4)
+        self.assertEqual(policy[-1], 0)
+

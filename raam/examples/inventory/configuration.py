@@ -22,7 +22,7 @@ DefaultConfiguration = {
 
 def construct_martingale(prices, variance):
     """
-    Constructs a definitions with a martingale definitoin of transition probabilities. 
+    Constructs a definitions with a martingale definition of transition probabilities. 
     The change in price is modeled as a normal distribution with zero mean and 
     the specified variance. 
     
