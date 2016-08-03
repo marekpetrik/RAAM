@@ -52,7 +52,9 @@ DefaultConfiguration = {
     "initial_inventory" : 0.5,
     "degradation" : {"fun":"polynomial","charge":[0,0,0.01],"discharge":[0.01,0.02,0.01]},
     "capacity_cost" : 1,
-    "change_capacity" : True
+    "change_capacity" : True,
+    "charge_limit" : 1, # limit on charge in a single step
+    "discharge_limit" : 1  # limit on discharge in a single step, absolute value
     }
 
 
@@ -102,6 +104,13 @@ class Simulator(raam.Simulator):
         self.capacity_cost = config['capacity_cost']
         self.change_capacity = config['change_capacity']
         self.initial_inventory = config['initial_inventory']
+
+        if 'charge_limit' not in config:
+            warn('No charge_limit in config, using 1')
+        if 'discharge_limit' not in config:
+            warn('No disccharge_limit in config, using 1')
+        self.charge_limit = config['charge_limit'] if 'charge_limit' in config else 1
+        self.discharge_limit = config['discharge_limit'] if 'discharge_limit' in config else 1
 
         # state and the distributions
         self._all_states = None
@@ -153,7 +162,7 @@ class Simulator(raam.Simulator):
 
             pricecount = len(self.price_buy)
 
-            # if the capacity does not chnage, then aggregate the capacity dimension to only one value
+            # if the capacity does not change, then aggregate the capacity dimension to only one value
             if self.change_capacity:
                 # make sure that the centers of price clusters are integer numbers
                 self._state_aggregation = raam.features.GridAggregation(\
@@ -164,7 +173,7 @@ class Simulator(raam.Simulator):
                          ((0,self.initial_capacity), (self.initial_capacity-0.1,self.initial_capacity+0.1), (-0.5,pricecount-0.5)), \
                          (self._inventory_cnt, 1, pricecount)  )
 
-            self._all_states = list(self._state_aggregation.centers())
+            self._all_states = [s for s in self._state_aggregation.centers() if s[0] <= s[1]]
     
         return self._all_states
 
@@ -329,19 +338,17 @@ class Simulator(raam.Simulator):
 
         return (reward,(ninventory,ncapacity,npriceindex))
 
-    def actions(self,decstate):
+    def actions(self, state):
         """
-        List of applicable actions in the state
+        List of applicable actions in the state. Relative change
+        in capacity
         """
-        inventory, capacity, _ = decstate
-        return np.linspace(-inventory, capacity - inventory, self._action_cnt)
+        inventory, capacity, _ = state
 
-    def all_actions(self):
-        """
-        List of all possible actions (charge and discharge capacities)
-        """
-        return np.arange(-self.initial_capacity, self.initial_capacity, \
-                            self._action_cnt)
+        discharge_floor = max(-inventory,-self.discharge_limit)
+        charge_ceil = min(capacity - inventory,self.charge_limit)
+
+        return np.linspace(discharge_floor, charge_ceil, self._action_cnt)
 
     def initstates(self):
         """ The initial state is given by the configuration and the 1st state of the 
