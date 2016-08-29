@@ -138,7 +138,7 @@ class Simulator(raam.Simulator):
         if self._all_states is None:
             self.all_states()
 
-        return self._state_aggregation.classify(decstate)
+        return self._aggindex2stateindex[self._state_aggregation.classify(decstate)]
 
 
     def all_states(self):
@@ -173,8 +173,21 @@ class Simulator(raam.Simulator):
                          ((0,self.initial_capacity), (self.initial_capacity-0.1,self.initial_capacity+0.1), (-0.5,pricecount-0.5)), \
                          (self._inventory_cnt, 1, pricecount)  )
 
-            self._all_states = [s for s in self._state_aggregation.centers() if s[0] <= s[1]]
-    
+            
+            
+            centers = list(self._state_aggregation.centers())
+
+            # select only states that have smaller inventory than capacity,
+            # and construct the mapping from aggregation index to the index in all_states
+            self._all_states, stateindex2aggindex = \
+                zip(*( (s,i) for i,s in enumerate(centers) \
+                        if s[0] <= s[1]))
+
+            # invert the aggregation index
+            self._aggindex2stateindex = [None] * len(centers)
+            for si,ai in enumerate(stateindex2aggindex):
+                self._aggindex2stateindex[ai] = si
+
         return self._all_states
 
     def initial_distribution(self):
