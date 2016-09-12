@@ -4,6 +4,7 @@ import raam
 import pickle
 from raam import features
 from scipy import cluster
+from warnings import warn
 
 def degradation(fun,charge,discharge):
     """
@@ -108,7 +109,7 @@ class Simulator(raam.Simulator):
         if 'charge_limit' not in config:
             warn('No charge_limit in config, using 1')
         if 'discharge_limit' not in config:
-            warn('No disccharge_limit in config, using 1')
+            warn('No discharge_limit in config, using 1')
         self.charge_limit = config['charge_limit'] if 'charge_limit' in config else 1
         self.discharge_limit = config['discharge_limit'] if 'discharge_limit' in config else 1
 
