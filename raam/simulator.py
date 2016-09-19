@@ -494,7 +494,7 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
         
     return policy
  
-def construct_mdp(sim, discount, show_progress=False):
+def construct_mdp(sim, discount, show_progress=None):
     """
     Uses the simulator `sim` to construct an MDP model. 
     
@@ -523,8 +523,10 @@ def construct_mdp(sim, discount, show_progress=False):
         Needs functions: all_transitions and all_states 
     discount : float 
         Discount factor
-    show_progress : bool, optional
-        Shows progress. Requires tqdm.
+    show_progress : string ({"notebook",<anystring>}), optional
+        Shows progress bar if not null. Requires tqdm.
+        "notebook" integrates better with a Jupyter notebook,
+        any other string shows the standard progress bar
         
     Returns
     -------
@@ -547,10 +549,15 @@ def construct_mdp(sim, discount, show_progress=False):
     # used to wrap the counter to enable progress reporting
     statecounter = list(enumerate(allstates))
     
-    if show_progress:
+    if show_progress is not None:
         try:
-            from tqdm import tqdm
-            statecounter = tqdm(statecounter)
+            if show_progress == "notebook":
+                from tqdm import tqdm_notebook
+                statecounter = tqdm_notebook(statecounter,desc="MDP")
+            else:
+                from tqdm import tqdm
+                statecounter = tqdm(statecounter,desc="MDP")
+
         except Exception as e:
             import warnings
             warnings.warn('Importing tqdm failed, not showing progress')
