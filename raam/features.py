@@ -10,6 +10,7 @@ import numpy as np
 import math
 import copy
 import raam.samples
+import collections
 from operator import itemgetter
 
 
@@ -291,7 +292,7 @@ class IdCache:
     calling the class instance/object as a function (or use the method __call__). 
     This class can be used to generate id's online for a set of values.
     
-    The list is converted to a tuple.
+    The list is converted to a `.
     
     Example
     -------
@@ -320,8 +321,8 @@ class IdCache:
         add : bool, optional
             Whether to add the element to the cache is not present
         """
-        # convert lists to tuples to make them immutable
-        if type(state) is list: ts = tuple(state)
+        # convert lists/arrays to tuples to make them immutable, may still fail
+        if not isinstance(state, collections.Hashable): ts = tuple(state)
         else: ts = state
         if ts in self.state_vals:
             return self.state_vals[ts]
