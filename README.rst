@@ -183,6 +183,7 @@ These samples use the raw state and action representation. The state is in integ
 And finally, the following code will actually solve the MDP.
 
 .. code:: python
+
     # construct MDP from the samples
     smdp = crobust.SampledMDP()
     smdp.add_samples(ds)
