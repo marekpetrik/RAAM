@@ -8,7 +8,7 @@ RAAM: Robust and Approximate Markov Decision Processes
 .. role:: python(code)
     :language: python
 
-A simple and easy to use **Python** library to solve Markov decision processes and *robust* Markov decision processes. The library also contains basic simulation routines, approximate dynamic programming through *state aggregation*, and the construction of MDPs from simulation. 
+A simple and easy to use **Python** library to solve Markov decision processes and *robust* Markov decision processes. The library includes mostly helper functions for the CRAAM python interface. In particular, it contains basic simulation routines, approximate dynamic programming through *state aggregation*, and the construction of MDPs from simulation. 
 
 The library supports standard finite or infinite horizon discounted MDPs [Puterman2005]_. The library assumes *maximization* over actions. The states and actions must be finite. 
 
@@ -31,12 +31,12 @@ Installation
 
 Requirements:
 
-- Python 3.3+ (Python 2 is NOT supported)
+- craam 1.0+ C++ implementation of methods for solving MDPs
+- Python 3.5+ (Python 2 is NOT supported)
 - Setuptools 7.0
 - Numpy 1.8+
 - Scipy 0.13 
 - Cython 0.21+ 
-- craam 1.0+ Methods for solving robust MDPs
 
 The package has been tested only on Linux.
 
@@ -44,8 +44,7 @@ Optional dependencies:
 
 - Matplotlib 1.0+ for plotting support
 
-
-To install, simply execute (use ``--user`` to install locally):
+To install, run (use ``--user`` to install locally):
 
 .. code:: bash
 
@@ -79,7 +78,6 @@ Structure
 
 The project consists of the following main modules:
 
-* :python:`raam.crobust` - the main algorithms and the python interface to `CRAAM`_
 * :python:`raam.robust` - a pure python implementation of selected robust optimization methods
 * :python:`raam.simulator` - framework code for implementing a simulation-based MDP formulation and optimization
 * :python:`raam.samples` - methods for handling samples
@@ -89,16 +87,16 @@ The project consists of the following main modules:
 * :python:`raam.test` - code unit tests
 
 
-The package :python:`raam.crobust` implements the following algorithms.
+Methods for solving robust MDPs are provided by :python:`craam.robust`. 
 
 ================================  ====================================
 Method                            Algorithm
 ================================  ====================================
-:python:`crobust.RoMDP.vi_gs`      Gauss-Seidel value iteration; runs in a single thread. Computes the worst-case outcome for each action.
-:python:`crobust.RoMDP.vi_jac`     Jacobi value iteration; parallelized with OpenMP. Computes the worst-case outcome for each action.
-:python:`crobust.RoMDP.vi_gs_l1`   The same as ``vi_gs`` except the worst case is bounded with respect to an :math:`L_1` norm.
-:python:`crobust.RoMDP.vi_jac_l1`  The same as ``vi_jac`` except the worst case is bounded with respect to an :math:`L_1` norm.
-:python:`crobust.RoMDP.mpi_jac`    Jacobi modified policy iteration; parallelized with OpenMP. Computes the worst-case outcome for each action. Generally, modified policy iteration is vastly more efficient than value iteration.
+:python:`crobust.MDP.vi_gs`      Gauss-Seidel value iteration; runs in a single thread. Computes the worst-case outcome for each action.
+:python:`crobust.MDP.vi_jac`     Jacobi value iteration; parallelized with OpenMP. Computes the worst-case outcome for each action.
+:python:`crobust.MDP.vi_gs_l1`   The same as ``vi_gs`` except the worst case is bounded with respect to an :math:`L_1` norm.
+:python:`crobust.MDP.vi_jac_l1`  The same as ``vi_jac`` except the worst case is bounded with respect to an :math:`L_1` norm.
+:python:`crobust.MDP.mpi_jac`    Jacobi modified policy iteration; parallelized with OpenMP. Computes the worst-case outcome for each action. Generally, modified policy iteration is vastly more efficient than value iteration.
 ================================  ====================================
 
 First Steps
@@ -107,47 +105,21 @@ First Steps
 Solving a Simple MDP
 ~~~~~~~~~~~~~~~~~~~~
 
-The following code solves a simple (non-robust) MDP problem precisely using modified policy iteration.
-
-.. code:: python
-
-    from raam import crobust
-
-    states = 100
-    P1 = np.random.rand(states,states)
-    P1 = np.diag(1/np.sum(P1,1)).dot(P1)
-    P2 = np.random.rand(states,states)
-    P2 = np.diag(1/np.sum(P2,1)).dot(P2)
-    r1 = np.random.rand(states)
-    r2 = np.random.rand(states)
-    
-    transitions = np.dstack((P1,P2))
-    rewards = np.column_stack((r1,r2))
-    actions = np.array((0,1))
-    outcomes = np.array((0,0))
-    
-    rmdp = crobust.RoMDP(states,0.99)
-    rmdp.from_matrices(transitions,rewards,actions,outcomes)
-    value,policy,residual,iterations = rmdp.mpi_jac(100)
-
-    print('Value function', value)
-
-This example could be easily converted to a robust MDP by appropriately defining additional outcomes (the options available to nature) with transition matrices and rewards.
+See library CRAAM for a simple example. 
 
 Solving a Sample-based MDP (reinforcement learning)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-First, define a simulator for a simple counter MDP. There are two types of states in the simulated MDP: decision and expectation states. The decision state is the standard MDP state, while the expectation state represents a post-decision state. The evolution of the process alternates between decision and expectation states.
+First, define a simulator for a simple MDP chain and sample from it.
 
 .. code:: python
-    
     import raam
     import random
+    import itertools
 
-    class StatefulCounter(raam.simulator.StatefulSimulator):  
+    class StatefulCounter(raam.simulator.Simulator):  
         """
-        Decision state: position in chain
-        Expectation state: position in chain, change (+1,-1)
+        State: position in chain
         Initial (decision) state: 0
         Actions: {plus, minus}
         Rewards: 90%: next position, 10% this position in chain
@@ -160,40 +132,28 @@ First, define a simulator for a simple counter MDP. There are two types of state
         def discount(self):
             return 0.9
             
-        def transition_dec(self,action):
+        def transition(self,state,action):
             decstate = self.state
             
-            if action == 'plus':
-                self.state = (decstate, +1)
-            elif action == 'minus':
-                self.state = (decstate, -1)
-            else:
-                raise ValueError('Invalid action')
+            if action == 'plus': act = 1
+            elif action == 'minus': act = -1
+            else: raise ValueError('Invalid action')
+            
+            if random.random() <= 0.9: self.state = state + act
+            else: self.state = state            
+            return state,self.state 
             
             return self.state
-            
-        def transition_exp(self):        
-            pos,act = self.state
-
-            if random.random() <= 0.9:
-                self.state = pos + act
-            else:
-                self.state = pos            
-            return pos,self.state            
                 
-        def end_condition(self,decstate):
+        def end_condition(self,state):
             return False
             
-        def reinitstate(self,param):
-            self.state = 0
-            return self.state
+        def initstates(self):
+            return itertools.repeat(0)
             
-        def actions(self):
+        def actions(self,state):
             return ['plus','minus']
-
-This is an example of a stateful simulator class based on :python:`raam.simulator.StatefulSimulator`. Stateless simulator that allow to model transitions starting in arbitrary states can be based on :python:`raam.simulator.Simulator`.
-
-
+            
 The next step is to generate samples as follows:
 
 .. code:: python
@@ -202,28 +162,32 @@ The next step is to generate samples as follows:
     runs = 5
     sim = StatefulCounter()
     samples = sim.simulate(horizon,sim.random_policy(),runs)
+    print("Samples:\n", list(samples.samples()))
     
-And finally, the samples are used to construct an sampled robust MDP. Even and odd states are aggregated together. :python:`craam.SRoMDP` is a sampled version of the robust MDP.
+These samples use the raw state and action representation. The state is in integer in this case, but it could be in principle any python object. So to formulate an MDP, we need to assign unique indices to the states as follows:
 
 .. code:: python
 
-    from raam import crobust
+    from craam import crobust
     from raam import features
-    r = crobust.SRoMDP(2,0.9)
     
-    aggregation = lambda s: s // 2  # aggregate states
-    idnt = lambda s: s              # assume the worst-case behavior of individual states
-    expcache = features.IdCache()    # treat every expectation state separately
-    actcache = features.IdCache()    # treat every action separately
-    r.from_samples(samples,decagg_big=aggregation,decagg_small=idnt,
-                    expagg=expcache,actagg=actcache)
-    
-    r.rmdp.set_uniform_distributions(1.0)   # define uniform distributions for norm bounds
-    val,pol = r.rmdp.mpi_jac_l1(100)[:2]
-    # map value function 
-    val = r.decvalue(12,val,minstate=-6)
-    pol = r.decpolicy(12,pol,minstate=-6)
+    # transform the samples to discrete samples (build a discrete view)
+    # each state (-infinity, +infinity) is assigned a uniques index by IdCache
+    sv = raam.SampleView(samples=samples,statemap=features.IdCache(), actmap = features.IdCache(), readonly=True)
+    ds = crobust.DiscreteSamples()
+    for i in sv.initialsamples():
+        ds.add_initial(i)
+    for s in sv.samples():
+        ds.add_sample(s.statefrom, s.action, s.stateto, s.reward, s.weight, s.step, s.run)
 
+And finally, the following code will actually solve the MDP.
+
+.. code:: python
+    # construct MDP from the samples
+    smdp = crobust.SampledMDP()
+    smdp.add_samples(ds)
+    mdp = smdp.get_mdp(0.9)
+    print(mdp.mpi_jac())
 
 Note that it is important to map the value function and policy in the last two lines. This is because the sampled robust MDP uses an internal representation that separates decision and expectation states in order to improve computational efficiency.
 

@@ -320,7 +320,9 @@ class IdCache:
         add : bool, optional
             Whether to add the element to the cache is not present
         """
-        ts = tuple(state)
+        # convert lists to tuples to make them immutable
+        if type(state) is list: ts = tuple(state)
+        else: ts = state
         if ts in self.state_vals:
             return self.state_vals[ts]
         elif add:
@@ -329,7 +331,6 @@ class IdCache:
             return nn
         else:
             raise ValueError('Element not present in the cache and add=False.')
-
 
 class IndexCache:
     """

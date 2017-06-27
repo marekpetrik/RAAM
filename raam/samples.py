@@ -204,52 +204,6 @@ class MemSamples(Samples):
         """
         self.dec_samples = samples if samples is not None else []
         self.init_samples = init_samples if init_samples is not None else []
-
-    def encode_json(samples, validate=True):
-        """
-        Encodes samples into a json file which can be saved and used by other tools
-    
-        Parameters
-        ----------
-        validate : bool, optional
-            Validate samples before they are saved
-    
-        Returns
-        -------
-        out : string
-            JSON encoding of the samples
-        """
-        
-        if validate:
-            samples.validate()
-
-        return json.dumps({ 'samples':samples.dec_samples, 
-                            'initial':samples.init_samples } )
-        
-    @staticmethod
-    def decode_json(jsonstring, validate=True):
-        """
-        Decodes samples from a json file to a dictionary
-    
-        Parameters
-        ----------
-        jsonstring : string
-            JSON encoding of the samples
-        validate : bool, optional
-            Validate samples after they are loaded
-    
-        Returns
-        -------
-        out : MemSamples
-            Samples loaded in MemSamples
-        """
-        samples = MemSamples()
-        loaded = json.loads(jsonstring)
-        samples.dec_samples = loaded['samples']
-        samples.init_samples = loaded['initial']
-        if validate:
-           samples.validate()
-        return samples
         
     def samples(self):
         """ Returns an iterator over transition samples.  """

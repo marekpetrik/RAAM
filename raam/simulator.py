@@ -39,16 +39,7 @@ class Simulator(metaclass=abc.ABCMeta):
     Represents a simulator class that can be used to generate samples.
     The class must be inherited from to define the actual simulator.
 
-    The simulation is based on two types of states: 
-        1. Decision states - states in which decisions are taken and the  deterministic 
-            transition is to expectation states
-        2. Expectation states - states from which the transition is stochastic 
-            into decision states. The reward is also determined in this transition.
-
-    See also :class:`StatefulSimulator` for a simulator framework that does not support
-    sampling arbitrary states.
-
-    The representation of the decision and expectation states may be arbitrary objects.
+    The representation of states may be arbitrary objects.
 
     The simulator can also represent a stateful process. Reading the initial
     state would reset the simulation to the beginning.
@@ -57,14 +48,14 @@ class Simulator(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def transition(self,state,action):
         """
-        Computes the transition from a decision state to an expectation state. 
+        Computes the transition from a state to another state. 
         This is a deterministic function and it must return the same value 
         every time it is called.
 
         Parameters
         ----------
         state : object
-            Domain dependent representation of a decision state
+            Domain dependent representation of a state
         action : object
             Domain dependent representation of an action
 
@@ -73,7 +64,7 @@ class Simulator(metaclass=abc.ABCMeta):
         reward : float
             Reward associated with the transition
         state : object
-            Domain dependent representation of a decision state
+            Domain dependent representation of a state
         """
         pass
 
@@ -93,7 +84,7 @@ class Simulator(metaclass=abc.ABCMeta):
     def initstates(self):
         """ 
         Returns a list or a generator (possibly unbounded) of the initial 
-        decision states.
+        states.
 
         Reading another initial state may reset the current state
         of the simulator (if it is stateful).
@@ -107,7 +98,7 @@ class Simulator(metaclass=abc.ABCMeta):
         Parameters
         ----------
         state : state
-            Decision state to be checked
+            State to be checked
 
         Returns
         -------
@@ -122,7 +113,7 @@ class Simulator(metaclass=abc.ABCMeta):
 
     def compute_value(self, state, action, valuefun, samplecount=10):
         """ 
-        Computes the value of an expectation state
+        Computes the value of an state
 
         Parameters
         ----------
@@ -131,7 +122,7 @@ class Simulator(metaclass=abc.ABCMeta):
         action : Action
             Action taken
         valuefun :  function(state -> float) 
-            Value function for decision states
+            Value function for states
         samplecount : int 
             The number of samples to be used in computing the expected 
             value function
@@ -139,7 +130,7 @@ class Simulator(metaclass=abc.ABCMeta):
         Returns
         -------
         out : float
-            Value of the expectation state
+            Value of the state
         """
         result = 0
         for s in range(samplecount):
@@ -168,7 +159,7 @@ class Simulator(metaclass=abc.ABCMeta):
             If not provided then the default initial states of the 
             simulator are used. Use itertools.repeat to use a single state.
         end_condition : function (state->bool) (optional)
-            A function that takes a decision state and returns true if 
+            A function that takes a state and returns true if 
             a terminal state is reached.
         startsteps : int, list of ints (optional)
             The simulation will start in this step (for each run)
@@ -248,17 +239,17 @@ class Simulator(metaclass=abc.ABCMeta):
     
     def greedy_policy_v(simulator,value,samplecount,features=None,actionset=None):
         """
-        Computes a greedy policy for the provided **decision state** value function.
+        Computes a greedy policy for the provided a value function.
     
         Parameters
         ----------
         value : {function(state -> float), array_like}
-            Decision state value function used to compute the policy.
+            State value function used to compute the policy.
             If a list is provided then it is assumed to be coefficients
             and the appropriate function is constructed using the simulator.
         samplecount : int
-            Number of samples to use in estimating the value of an expectation 
-            state from samples of transitions to decision states.
+            Number of samples to use in estimating the value of a 
+            state from samples of transitions to states.
         actionset : set, optional
             Set of actions considered when computing the policy.
             When not provided or None, the default actions from the
@@ -338,15 +329,15 @@ class Simulator(metaclass=abc.ABCMeta):
             Collection of samples being expanded. This object is not modified.
         count : int
             The number of additional samples to generate for each 
-            expectation state.
+            state.
         append : bool, optional
-            Whether to append the original expectation samples or if they 
+            Whether to append the original samples or if they 
             should be discarded. Default is true.
     
         Returns
         -------
         out : samples.Samples 
-            Original samples with the additional expectation states augmented
+            Original samples with the additional states augmented
     
         Notes
         -----
@@ -383,15 +374,15 @@ class Simulator(metaclass=abc.ABCMeta):
             length 1.
         count : int
             The number of additional samples to generate for each 
-            expectation state.
+            state.
         append : bool, optional
-            Whether to append the original expectation samples or if they 
+            Whether to append the original samples or if they 
             should be discarded. Default is true.
     
         Returns
         -------
         out : samples.Samples 
-            Original samples with the additional decision states augmented
+            Original samples augmented with new ones
     
         Notes
         -----
@@ -426,7 +417,7 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
     ----------
     policy_vec : numpy.ndarray (#states x #actions), 
                 or (#states) for a deterministic policy.
-        Probability of actions for each decision state, or the index of the
+        Probability of actions for each  state, or the index of the
         action. If it is a deterministic policy and the index is -1,
         the policy is assumed to be undefined.
     actions : list
@@ -436,7 +427,7 @@ def vec2policy(policy_vec,actions,decagg,noaction=None):
         sample.
     decagg : function (state -> int)
         A function that assigns the number of the aggregate state and its index
-        within the aggregation to each individual sample *decision* state.
+        within the aggregation to each individual  state.
     noaction : action, optional
         Action index to take in states that do not have a defined policy. The policy 
         is considered to be undefined when it is negative. This only works for 
