@@ -1,21 +1,28 @@
 """
-Convenient plotting functions
+Convenient plotting functions.
+
+See plot_grid for more details.
 """
 
 import matplotlib.pyplot as pp
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-def plot_grid(dec_agg,value=None,policy=None,ticks=(60,60),labels=('x','y')):
+def plot_grid(aggregation,value=None,policy=None,ticks=(60,60),labels=('x','y')):
     """
     Plots value function and policy for a gridded approximation for a 2D
     state space.
     
-    The policy must be a scalar!
+    Note that the solution of an MDP may be shorter than the number of states
+    in the aggregation when it is constructed from samples  and if states with 
+    high indexes are never sampled. You need to append a sufficient number of 
+    some values to the solutionin order to match the number of aggregate states.
+    
+    metplotlib.pyplot.show() needs to be used to actually show the plot.
     
     Parameters
     ----------
-    decagg : raam.features.GridAggregation
+    aggregation : raam.features.GridAggregation
         Aggregation class that was used to construct the value function and policy
     value : array, one value for each aggregate state, (optional)
         Maps states to the value function.
@@ -30,7 +37,7 @@ def plot_grid(dec_agg,value=None,policy=None,ticks=(60,60),labels=('x','y')):
     if value is None and policy is None:
         raise ValueError('Must provide either the value of the policy')
     
-    X,Y = dec_agg.meshgrid(ticks)
+    X,Y = aggregation.meshgrid(ticks)
     
     if value is not None and policy is not None:
         fig = pp.figure(1,figsize=(15,7))
@@ -43,7 +50,7 @@ def plot_grid(dec_agg,value=None,policy=None,ticks=(60,60),labels=('x','y')):
         ax = fig.add_subplot(121, projection='3d')
 
     if value is not None:
-        Z = dec_agg.eval_function(zip(X.flat, Y.flat), value)
+        Z = aggregation.eval_function(zip(X.flat, Y.flat), value)
         Z = np.array(Z).reshape(X.shape)
         
         ax.plot_surface(X,Y,Z)
@@ -56,7 +63,7 @@ def plot_grid(dec_agg,value=None,policy=None,ticks=(60,60),labels=('x','y')):
         ax = fig.add_subplot(122,projection='3d')
 
     if policy is not None:
-        P = dec_agg.eval_function(zip(X.flat, Y.flat), policy)
+        P = aggregation.eval_function(zip(X.flat, Y.flat), policy)
         P = np.array(P).reshape(X.shape)
     
         ax.plot_surface(X,Y,P)
