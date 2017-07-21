@@ -251,7 +251,7 @@ class TestPrecise(unittest.TestCase):
         m = craam.MDP(7, 0.9)
         for s in self.samplesstochd.samples():
             m.add_transition(s.statefrom, s.action, s.stateto, s.weight, s.reward)
-        valuefunction,_,_ ,_= m.vi_gs(200)
+        valuefunction,_,_ ,_= m.solve_vi(200)
     
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
@@ -286,14 +286,13 @@ class TestPrecise(unittest.TestCase):
             for a in actions:
                 rm.set_distribution(s,a,distributions[a][s,:])
         
-        rm.set_uniform_thresholds(0)
-        valuefunction,_,_,_,_  = rm.vi_gs(200)
+        valuefunction,_,_,_  = rm.solve_vi(iterations=200)
         des = [26.0562239092526, 25.41454564669827, 23.67375336867879, 22.30637803181092, 23.67375336867879, 25.41454564669827, 26.0562239025266]
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,3)     
                 
-        rm.set_uniform_thresholds(2)
-        valuefunction,_,_,_,_  = rm.vi_gs(200,stype=1)
+        thresholds = 2*np.ones(rm.state_count())
+        valuefunction,_,_,_,_  = rm.rsolve_vi(b"optimistic_l1", thresholds, iterations=200)
         des = [ 30., 30., 29., 27.1, 29., 30., 30.]    
         for a,b in zip(des, valuefunction):
             self.assertAlmostEqual(a,b,3)     
@@ -439,7 +438,7 @@ class RobustTests(unittest.TestCase):
         
         rmdp = craam.MDP(states,0.99)
         rmdp.from_matrices(transitions,rewards)
-        value,policy,residual,iterations = rmdp.mpi_jac(1000)
+        value,policy,residual,iterations = rmdp.solve_mpi(1000)
          
         target_value = [ 67.48585933,  67.6855307 ,  67.15995444,  67.33964064,
             67.35730334,  67.448749  ,  67.38176967,  67.65606086,
@@ -667,10 +666,10 @@ class TestMDPConstruction(unittest.TestCase):
          
         # solve mdp
 
-        value, policy, residual, iters = mdp.mpi_jac(1000)
+        value, policy, residual, iters = mdp.solve_mpi(1000)
 
-        self.assertEqual(value[0], 6.5167692414406195)
-        self.assertEqual(value[-1], 21.827503231912761)
+        self.assertAlmostEqual(value[0], 6.5167692414406195)
+        self.assertAlmostEqual(value[-1], 21.827503231912761)
 
         self.assertEqual(policy[0], 4)
         self.assertEqual(policy[-1], 0)
